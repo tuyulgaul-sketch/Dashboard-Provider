@@ -6,23 +6,16 @@ type Role="provider"|"callcenter";
 type CaseStatus="Waiting Admission"|"Treatment Active"|"Waiting Treatment Approval"|"Waiting Discharge"|"Closed";
 type CareCase={id:string,name:string,memberId:string,company:string,provider:string,status:CaseStatus,urgent:boolean,submittedAt:number,issue:string};
 
-const seed:CareCase[]=[
-{id:"MC-260928-00124",name:"Andi Pratama",memberId:"PL-88201921",company:"PT Pertamina Patra Niaga",provider:"RS Hermina Kemayoran",status:"Waiting Admission",urgent:true,submittedAt:Date.now()-4*60*1000,issue:"Nyeri dada akut sejak 30 menit"},
-{id:"MC-260928-00118",name:"Siti Rahmawati",memberId:"PL-77190215",company:"PT Kilang Pertamina Internasional",provider:"Klinik Pratama Sehat",status:"Waiting Treatment Approval",urgent:false,submittedAt:Date.now()-7*60*1000,issue:"Demam dan nyeri tenggorokan"},
-{id:"MC-260928-00109",name:"Budi Santoso",memberId:"PL-66182510",company:"PT Pertamina Hulu Energi",provider:"RS Pusat Pertamina",status:"Waiting Discharge",urgent:false,submittedAt:Date.now()-11*60*1000,issue:"Gastroenteritis"},
-{id:"MC-260928-00098",name:"Maria Lestari",memberId:"PL-55177201",company:"PT Pertamina (Persero)",provider:"RS Hermina Depok",status:"Treatment Active",urgent:false,submittedAt:Date.now()-2*60*1000,issue:"Migraine"}
-];
-
-function fmt(ms:number){const s=Math.max(0,Math.floor(ms/1000));const m=Math.floor(s/60);const sec=s%60;return String(m).padStart(2,"0")+":"+String(sec).padStart(2,"0")}
+const seed:CareCase[]=[];\n\nfunction fmt(ms:number){const s=Math.max(0,Math.floor(ms/1000));const m=Math.floor(s/60);const sec=s%60;return String(m).padStart(2,"0")+":"+String(sec).padStart(2,"0")}
 
 export default function Page(){
  const [role,setRole]=useState<Role>("provider");
  const [now,setNow]=useState(Date.now());
  const [cases,setCases]=useState<CareCase[]>(seed);
- const [query,setQuery]=useState("");
- useEffect(()=>{const t=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t)},[]);
+ const [query,setQuery]=useState("");\n const [statusFilter,setStatusFilter]=useState<CaseStatus|"Open"|null>(null);\n const [hydrated,setHydrated]=useState(false);
+ useEffect(()=>{\n   try{const saved=localStorage.getItem("pertalife-managed-care-cases");if(saved)setCases(JSON.parse(saved));}catch{}\n   setHydrated(true);\n   const t=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t)\n },[]);\n useEffect(()=>{if(hydrated)localStorage.setItem("pertalife-managed-care-cases",JSON.stringify(cases))},[cases,hydrated]);
  const waiting=useMemo(()=>cases.filter(c=>c.status.startsWith("Waiting")), [cases]);
- const filtered=cases.filter(c=>(c.name+" "+c.memberId+" "+c.company+" "+c.id).toLowerCase().includes(query.toLowerCase()));
+ const filtered=cases.filter(c=>(c.name+" "+c.memberId+" "+c.company+" "+c.id).toLowerCase().includes(query.toLowerCase())).filter(c=>statusFilter==="Open"?c.status!=="Closed":statusFilter?c.status===statusFilter:true);
  const decide=(id:string,status:CaseStatus)=>setCases(v=>v.map(c=>c.id===id?{...c,status,submittedAt:Date.now()}:c));
 
  return <div className="shell">
@@ -40,7 +33,7 @@ export default function Page(){
       <a><FileCheck2 size={18}/>Audit Trail</a>
     </>}
    </nav>
-   <div className="sideFoot"><span>Prototype Mode</span><small>Mock data · No production DB</small></div>
+   <div className="sideFoot"><span>Prototype Mode</span><small>Browser data · No production DB</small></div>
   </aside>
   <main>
    <header>
@@ -56,11 +49,7 @@ export default function Page(){
    </header>
 
    <section className="stats">
-    <div className="card stat"><div><span>Waiting Admission</span><strong>{cases.filter(c=>c.status==="Waiting Admission").length}</strong></div><div className="icon"><UserRound/></div></div>
-    <div className="card stat"><div><span>Waiting Treatment</span><strong>{cases.filter(c=>c.status==="Waiting Treatment Approval").length}</strong></div><div className="icon"><Stethoscope/></div></div>
-    <div className="card stat"><div><span>Waiting Discharge</span><strong>{cases.filter(c=>c.status==="Waiting Discharge").length}</strong></div><div className="icon"><FileCheck2/></div></div>
-    <div className="card stat"><div><span>Open Cases</span><strong>{cases.filter(c=>c.status!=="Closed").length}</strong></div><div className="icon"><Activity/></div></div>
-   </section>
+    <button className={"card stat "+(statusFilter==="Waiting Admission"?"selected":"")} onClick={()=>setStatusFilter(statusFilter==="Waiting Admission"?null:"Waiting Admission")}><div><span>Waiting Admission</span><strong>{cases.filter(c=>c.status==="Waiting Admission").length}</strong></div><div className="icon"><UserRound/></div></button>\n    <button className={"card stat "+(statusFilter==="Waiting Treatment Approval"?"selected":"")} onClick={()=>setStatusFilter(statusFilter==="Waiting Treatment Approval"?null:"Waiting Treatment Approval")}><div><span>Waiting Treatment</span><strong>{cases.filter(c=>c.status==="Waiting Treatment Approval").length}</strong></div><div className="icon"><Stethoscope/></div></button>\n    <button className={"card stat "+(statusFilter==="Waiting Discharge"?"selected":"")} onClick={()=>setStatusFilter(statusFilter==="Waiting Discharge"?null:"Waiting Discharge")}><div><span>Waiting Discharge</span><strong>{cases.filter(c=>c.status==="Waiting Discharge").length}</strong></div><div className="icon"><FileCheck2/></div></button>\n    <button className={"card stat "+(statusFilter==="Open"?"selected":"")} onClick={()=>setStatusFilter(statusFilter==="Open"?null:"Open")}><div><span>Open Cases</span><strong>{cases.filter(c=>c.status!=="Closed").length}</strong></div><div className="icon"><Activity/></div></button>\n   </section>
 
    {role==="provider"&&<section className="card eligibility">
       <div><h2>Cek Eligibility Peserta</h2><p>Validasi status aktif, FKTP/Faskes 1, dan kebutuhan urgency sebelum submit.</p></div>
@@ -79,7 +68,7 @@ export default function Page(){
     <div className="tableWrap"><table>
       <thead><tr><th>Case</th><th>Peserta</th><th>Provider / Perusahaan</th><th>Status</th><th>SLA</th>{role==="callcenter"&&<th>Aksi</th>}</tr></thead>
       <tbody>
-      {filtered.map(c=><tr key={c.id}>
+      {filtered.length===0?<tr><td colSpan={role==="callcenter"?6:5} className="emptyState"><b>{cases.length===0?"Belum ada case":"Tidak ada case pada filter ini"}</b><small>{cases.length===0?"Data akan muncul setelah lo membuat case dari alur Provider.":"Klik card aktif lagi untuk menghapus filter."}</small></td></tr>:filtered.map(c=><tr key={c.id}>
         <td><b>{c.id}</b><small>{c.issue}</small></td>
         <td><b>{c.name}</b><small>{c.memberId}</small></td>
         <td><b>{c.provider}</b><small>{c.company}</small></td>
