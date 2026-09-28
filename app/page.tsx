@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useMemo,useState} from "react";
-import {Activity,Building2,CheckCircle2,ChevronDown,Clock3,FileCheck2,HeartPulse,Search,ShieldCheck,Stethoscope,UserRound,AlertTriangle,Plus,Database,ArrowRight} from "lucide-react";
+import {Activity,Building2,CheckCircle2,ChevronDown,Clock3,FileCheck2,HeartPulse,Search,ShieldCheck,Stethoscope,UserRound,AlertTriangle,Plus,Database,ArrowRight,Upload,FileSpreadsheet} from "lucide-react";
 
 type Role="provider"|"callcenter";
 type CaseStatus="Waiting Admission"|"Treatment Active"|"Waiting Treatment Approval"|"Waiting Discharge"|"Closed";
@@ -18,7 +18,7 @@ export default function Page(){
  const [cardNo,setCardNo]=useState(""),[visitType,setVisitType]=useState("Rawat Jalan"),[found,setFound]=useState<Member|null>(null),[lookupDone,setLookupDone]=useState(false);
  const [urgent,setUrgent]=useState(false),[urgencyReason,setUrgencyReason]=useState(""),[urgencyText,setUrgencyText]=useState(""),[complaint,setComplaint]=useState("");
  const blank:Member={cardNo:"",name:"",dob:"",gender:"Laki-laki",company:"",policyNo:"",plan:"",relation:"Karyawan",active:true,faskes1:"",providerCategory:"Rumah Sakit",roomClass:"",annualLimit:0,remainingLimit:0};
- const [form,setForm]=useState<Member>(blank),[notice,setNotice]=useState("");
+ const [form,setForm]=useState<Member>(blank),[notice,setNotice]=useState("");\n const [uploadInfo,setUploadInfo]=useState<{file:string;valid:number;invalid:number;duplicate:number}|null>(null);
 
  useEffect(()=>{try{const m=localStorage.getItem("pertalife-managed-care-members"),c=localStorage.getItem("pertalife-managed-care-cases");if(m)setMembers(JSON.parse(m));if(c)setCases(JSON.parse(c));}catch{}setHydrated(true);const t=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t)},[]);
  useEffect(()=>{if(hydrated){localStorage.setItem("pertalife-managed-care-members",JSON.stringify(members));localStorage.setItem("pertalife-managed-care-cases",JSON.stringify(cases));}},[members,cases,hydrated]);
@@ -29,6 +29,22 @@ export default function Page(){
  const canSubmit=!!found&&found.active&&!!complaint.trim()&&(faskesMatch||(urgent&&!!urgencyReason&&(urgencyReason!=="Lainnya"||!!urgencyText.trim())));
 
  function saveMember(e:React.FormEvent){e.preventDefault();if(!form.cardNo.trim()||!form.name.trim()||!form.company.trim()||!form.faskes1.trim()){setNotice("Nomor kartu, nama, perusahaan, dan Faskes 1 wajib diisi.");return}if(members.some(m=>m.cardNo.toLowerCase()===form.cardNo.trim().toLowerCase())){setNotice("Nomor kartu sudah terdaftar.");return}setMembers(v=>[{...form,cardNo:form.cardNo.trim()},...v]);setForm(blank);setNotice("Master peserta berhasil disimpan di browser ini.");}
+ async function bulkUpload(e:React.ChangeEvent<HTMLInputElement>){
+  const file=e.target.files?.[0];if(!file)return;
+  try{
+   const XLSX=await import("xlsx");const wb=XLSX.read(await file.arrayBuffer(),{type:"array"});const ws=wb.Sheets["Master Peserta"]||wb.Sheets[wb.SheetNames[0]];
+   const rows=XLSX.utils.sheet_to_json<Record<string,unknown>>(ws,{defval:""});
+   let invalid=0,duplicate=0;const existing=new Set(members.map(m=>m.cardNo.toLowerCase()));const batch=new Set<string>();const valid:Member[]=[];
+   for(const r of rows){
+    const cardNo=String(r["Nomor Kartu"]||"").trim(),name=String(r["Nama Peserta"]||"").trim(),company=String(r["Perusahaan"]||"").trim(),faskes1=String(r["Faskes 1"]||"").trim();
+    if(!cardNo||!name||!company||!faskes1){invalid++;continue}
+    const key=cardNo.toLowerCase();if(existing.has(key)||batch.has(key)){duplicate++;continue}batch.add(key);
+    valid.push({cardNo,name,dob:String(r["Tanggal Lahir"]||""),gender:String(r["Jenis Kelamin"]||""),company,policyNo:String(r["Nomor Polis"]||""),plan:String(r["Plan"]||""),relation:String(r["Hubungan"]||"Karyawan"),active:String(r["Status Peserta"]||"Aktif").toLowerCase()!=="tidak aktif",faskes1,providerCategory:String(r["Kategori Provider"]||""),roomClass:String(r["Kelas Kamar"]||""),annualLimit:Number(r["Limit Tahunan"]||0),remainingLimit:Number(r["Sisa Limit"]||0)});
+   }
+   setMembers(v=>[...valid,...v]);setUploadInfo({file:file.name,valid:valid.length,invalid,duplicate});setNotice(valid.length?valid.length+" peserta berhasil diupload ke master.":"Tidak ada data baru yang dapat diupload.");
+  }catch{setNotice("File Excel tidak dapat dibaca. Pastikan menggunakan format template Master Peserta.");}
+  e.target.value="";
+ }
  function lookup(){const m=members.find(x=>x.cardNo.toLowerCase()===cardNo.trim().toLowerCase())||null;setFound(m);setLookupDone(true);setUrgent(false);setUrgencyReason("");setUrgencyText("");setComplaint("");}
  function submitAdmission(){if(!found||!canSubmit)return;const id="MC-"+new Date().toISOString().slice(2,10).replaceAll("-","")+"-"+String(cases.length+1).padStart(4,"0");setCases(v=>[{id,name:found.name,memberId:found.cardNo,company:found.company,provider:PROVIDER,status:"Waiting Admission",urgent,submittedAt:Date.now(),issue:complaint,visitType,urgencyReason:urgent?(urgencyReason==="Lainnya"?urgencyText:urgencyReason):undefined},...v]);setNotice("Admission berhasil dikirim ke Call Center PertaLife.");setFound(null);setCardNo("");setLookupDone(false);setComplaint("");setUrgent(false);}
  const decide=(id:string,status:CaseStatus)=>setCases(v=>v.map(c=>c.id===id?{...c,status,submittedAt:Date.now()}:c));
@@ -41,7 +57,10 @@ export default function Page(){
  {([["Waiting Admission","Waiting Admission",UserRound],["Waiting Treatment","Waiting Treatment Approval",Stethoscope],["Waiting Discharge","Waiting Discharge",FileCheck2],["Open Cases","Open",Activity]] as const).map(([label,key,Icon])=><button key={label} className={"card stat "+(statusFilter===key?"selected":"")} onClick={()=>setStatusFilter(statusFilter===key?null:key)}><div><span>{label}</span><strong>{key==="Open"?cases.filter(c=>c.status!=="Closed").length:cases.filter(c=>c.status===key).length}</strong></div><div className="icon"><Icon/></div></button>)}
  </section>
 
- {role==="callcenter"&&<section className="card master"><div className="sectionHead"><div><h2>Master Peserta Managed Care</h2><p>Bangun data eligibility sendiri. Data hanya tersimpan di browser ini.</p></div><span className="countPill">{members.length} peserta</span></div>
+ {role==="callcenter"&&<section className="card master"><div className="sectionHead"><div><h2>Master Peserta Managed Care</h2><p>Upload master peserta secara bulk dari Excel. Data hanya tersimpan di browser ini.</p></div><span className="countPill">{members.length} peserta</span></div>
+ <div className="bulkBox"><div className="bulkIcon"><FileSpreadsheet/></div><div><b>Bulk Upload Master Peserta</b><span>Gunakan kolom sesuai template Excel: Nomor Kartu, Nama Peserta, Perusahaan, Faskes 1, dan data eligibility lainnya.</span></div><label className="uploadBtn"><Upload size={17}/>Pilih File Excel<input type="file" accept=".xlsx,.xls" onChange={bulkUpload}/></label></div>
+ {uploadInfo&&<div className="uploadSummary"><b>{uploadInfo.file}</b><span className="good">{uploadInfo.valid} valid & imported</span><span>{uploadInfo.duplicate} duplicate</span><span className={uploadInfo.invalid?"badText":""}>{uploadInfo.invalid} invalid</span></div>}
+ <details className="manualEntry"><summary><Plus size={15}/>Input / koreksi satu peserta secara manual</summary>
  <form className="masterForm" onSubmit={saveMember}>
   <label>Nomor Kartu *<input value={form.cardNo} onChange={e=>setForm({...form,cardNo:e.target.value})} placeholder="Contoh MC10000001"/></label>
   <label>Nama Peserta *<input value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></label>
@@ -58,8 +77,7 @@ export default function Page(){
   <label>Sisa Limit<input type="number" value={form.remainingLimit||""} onChange={e=>setForm({...form,remainingLimit:Number(e.target.value)})}/></label>
   <label>Status<select value={form.active?"Aktif":"Tidak Aktif"} onChange={e=>setForm({...form,active:e.target.value==="Aktif"})}><option>Aktif</option><option>Tidak Aktif</option></select></label>
   <button className="primary saveBtn" type="submit"><Plus size={17}/>Simpan Peserta</button>
- </form>
- {members.length>0&&<div className="miniTable"><table><thead><tr><th>No. Kartu</th><th>Peserta</th><th>Perusahaan</th><th>Faskes 1</th><th>Status</th></tr></thead><tbody>{members.map(m=><tr key={m.cardNo}><td><b>{m.cardNo}</b></td><td><b>{m.name}</b><small>{m.relation} · {m.plan||"-"}</small></td><td>{m.company}</td><td>{m.faskes1}</td><td><span className={"statusDot "+(m.active?"ok":"no")}>{m.active?"Aktif":"Tidak Aktif"}</span></td></tr>)}</tbody></table></div>}
+ </form></details>\n {members.length>0&&<div className="miniTable"><table><thead><tr><th>No. Kartu</th><th>Peserta</th><th>Perusahaan</th><th>Faskes 1</th><th>Status</th></tr></thead><tbody>{members.map(m=><tr key={m.cardNo}><td><b>{m.cardNo}</b></td><td><b>{m.name}</b><small>{m.relation} · {m.plan||"-"}</small></td><td>{m.company}</td><td>{m.faskes1}</td><td><span className={"statusDot "+(m.active?"ok":"no")}>{m.active?"Aktif":"Tidak Aktif"}</span></td></tr>)}</tbody></table></div>}
  </section>}
 
  {role==="provider"&&<section className="card eligibility"><div><h2>Cek Eligibility Peserta</h2><p>Provider aktif: <b>{PROVIDER}</b>. Cari menggunakan Nomor Kartu.</p></div><div className="eligGrid"><label>Nomor Kartu<input value={cardNo} onChange={e=>setCardNo(e.target.value)} placeholder="Masukkan nomor kartu"/></label><label>Jenis Kunjungan<select value={visitType} onChange={e=>setVisitType(e.target.value)}><option>Rawat Jalan</option><option>UGD / IGD</option><option>Emergency Gigi</option></select></label><button className="primary" onClick={lookup}><Search size={17}/>Cek Eligibility</button></div>
