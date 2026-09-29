@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useMemo,useState} from "react";
-import {Activity,AlertTriangle,ArrowRight,Building2,CheckCircle2,ChevronDown,ChevronLeft,ChevronRight,Clock3,Database,Eye,FileCheck2,FileSpreadsheet,HeartPulse,Plus,Search,ShieldCheck,Stethoscope,Trash2,Upload,UserRound,X} from "lucide-react";
+import {Activity,AlertTriangle,ArrowRight,Building2,CheckCircle2,ChevronDown,ChevronLeft,ChevronRight,Clock3,Database,Eye,FileCheck2,FileSpreadsheet,HeartPulse,Plus,Search,Settings,ShieldCheck,Stethoscope,Trash2,Upload,UserRound,X} from "lucide-react";
 
 type Role="provider"|"callcenter";
 type CaseStatus="Waiting Admission"|"Treatment Active"|"Waiting Treatment Approval"|"Treatment Approved"|"Waiting Discharge"|"Closed";
@@ -9,6 +9,10 @@ type Member={
  membershipNo:string;name:string;employeeName:string;employeeMembershipNo:string;dob:string;
  inception:string;expiry:string;gender:string;maritalStatus:string;relation:string;cardNo:string;
  product:string;planName:string;planCode:string;faskes1Code:string;faskes1Name:string;faskes1?:string;
+};
+type ProviderProfile={
+ providerCode:string;providerName:string;providerType:string;address:string;city:string;contactPerson:string;
+ phone:string;email:string;paymentMethod:string;bankName:string;accountNo:string;accountName:string;updatedAt?:number;
 };
 type ClaimDocument={label:string;submitted:boolean;fileName?:string;cs:boolean;cl:boolean;fa:boolean;remark:string};
 type ClaimSubmission={
@@ -33,6 +37,10 @@ const providerAccounts=[
  {code:"PRV-HERMINA-KMY-001",name:"RS Hermina Kemayoran"},
  {code:"PRV-KF-CBT-001",name:"Klinik Kimia Farma Cibitung"}
 ] as const;
+const defaultProviderProfiles:Record<string,ProviderProfile>={
+ "PRV-HERMINA-KMY-001":{providerCode:"PRV-HERMINA-KMY-001",providerName:"RS Hermina Kemayoran",providerType:"Rumah Sakit",address:"",city:"",contactPerson:"",phone:"",email:"",paymentMethod:"Transfer",bankName:"",accountNo:"",accountName:""},
+ "PRV-KF-CBT-001":{providerCode:"PRV-KF-CBT-001",providerName:"Klinik Kimia Farma Cibitung",providerType:"Klinik",address:"",city:"",contactPerson:"",phone:"",email:"",paymentMethod:"Transfer",bankName:"",accountNo:"",accountName:""}
+};
 const urgencyOptions=["Kecelakaan","Kondisi akut / kegawatdaruratan","Di luar area Faskes 1","Faskes 1 tidak beroperasi","Emergency gigi - dokter gigi umum","Kondisi on-site di lokasi kerja","Lainnya"];
 const requiredHeaders=["POLICYNO","COMPANY","DEPARTMENT","START DATE","END DATE","MEMBERSHIP NO","MEMBER NAME","EMPLOYEE NAME","EMPLOYEE MEMBERSHIP NO","DOB","INCEPTION","EXPIRY","GENDER","MARITAL STATUS","RELATIONSHIP","CARD NO","PRODUCT","PLAN NAME","FASKES 1 CODE","FASKES 1 NAME"];
 const optionalReviewHeaders=["PLAN CODE"];
@@ -76,13 +84,16 @@ export default function Page(){
  const [treatmentDiagnosis,setTreatmentDiagnosis]=useState(""),[treatmentProcedure,setTreatmentProcedure]=useState(""),[treatmentMedication,setTreatmentMedication]=useState(""),[treatmentCost,setTreatmentCost]=useState(""),[treatmentReason,setTreatmentReason]=useState(""),[treatmentAttachments,setTreatmentAttachments]=useState<string[]>([]);
  const [finalDiagnosis,setFinalDiagnosis]=useState(""),[finalBill,setFinalBill]=useState(""),[dischargeNotes,setDischargeNotes]=useState("");
  const [claimDraft,setClaimDraft]=useState<ClaimSubmission|null>(null),[selectedClaimCases,setSelectedClaimCases]=useState<string[]>([]);
+ const [providerProfiles,setProviderProfiles]=useState<Record<string,ProviderProfile>>(defaultProviderProfiles),[profileDraft,setProfileDraft]=useState<ProviderProfile|null>(null);
  const [uploadReview,setUploadReview]=useState<UploadReview|null>(null); const [reviewFilter,setReviewFilter]=useState("all"); const [memberPage,setMemberPage]=useState(1); const [memberPageSize,setMemberPageSize]=useState(50);
 
- useEffect(()=>{try{const m=localStorage.getItem("pertalife-managed-care-members-v2"),c=localStorage.getItem("pertalife-managed-care-cases");if(m)setMembers(JSON.parse(m));if(c)setCases(JSON.parse(c));}catch{}setHydrated(true);const t=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t)},[]);
+ useEffect(()=>{try{const m=localStorage.getItem("pertalife-managed-care-members-v2"),c=localStorage.getItem("pertalife-managed-care-cases"),p=localStorage.getItem("pertalife-managed-care-provider-profiles");if(m)setMembers(JSON.parse(m));if(c)setCases(JSON.parse(c));if(p)setProviderProfiles({...defaultProviderProfiles,...JSON.parse(p)});}catch{}setHydrated(true);const t=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t)},[]);
  useEffect(()=>{if(hydrated)localStorage.setItem("pertalife-managed-care-members-v2",JSON.stringify(members));},[members,hydrated]);
  useEffect(()=>{if(hydrated)localStorage.setItem("pertalife-managed-care-cases",JSON.stringify(cases));},[cases,hydrated]);
+ useEffect(()=>{if(hydrated)localStorage.setItem("pertalife-managed-care-provider-profiles",JSON.stringify(providerProfiles));},[providerProfiles,hydrated]);
 
  const activeProvider=providerAccounts.find(p=>p.code===activeProviderCode)||providerAccounts[0];
+ const activeProviderProfile=providerProfiles[activeProvider.code]||defaultProviderProfiles[activeProvider.code];
  const visibleCases=useMemo(()=>role==="provider"?cases.filter(c=>c.providerCode===activeProvider.code||(!c.providerCode&&c.provider===activeProvider.name)):cases,[cases,role,activeProvider.code,activeProvider.name]);
  const waiting=useMemo(()=>visibleCases.filter(c=>c.status.startsWith("Waiting")),[visibleCases]);
  const filtered=visibleCases.filter(c=>(c.name+" "+c.memberId+" "+c.company+" "+c.id).toLowerCase().includes(query.toLowerCase())).filter(c=>statusFilter==="Open"?c.status!=="Closed":statusFilter?c.status===statusFilter:true);
@@ -208,20 +219,33 @@ export default function Page(){
   setCases(v=>v.map(c=>c.id===id&&c.confirmation?{...c,confirmation:{...c.confirmation,response:response.trim(),respondedAt:Date.now()},submittedAt:Date.now()}:c));
   setNotice("Klarifikasi berhasil dikirim ke Call Center PertaLife.");
  }
+ function openProviderProfile(){
+  const profile=providerProfiles[activeProvider.code]||defaultProviderProfiles[activeProvider.code];
+  setProfileDraft({...profile,providerCode:activeProvider.code,providerName:activeProvider.name});
+  setView("profile");setNotice("");
+ }
+ function saveProviderProfile(){
+  if(!profileDraft)return;
+  if(!profileDraft.providerName.trim()){setNotice("Nama Provider tidak boleh kosong.");return}
+  const saved={...profileDraft,providerCode:activeProvider.code,providerName:activeProvider.name,updatedAt:Date.now()};
+  setProviderProfiles(v=>({...v,[activeProvider.code]:saved}));
+  setProfileDraft(saved);
+  setNotice("Profile "+activeProvider.name+" berhasil disimpan.");
+ }
  function toggleClaimCase(id:string){
   setSelectedClaimCases(v=>v.includes(id)?v.filter(x=>x!==id):[...v,id]);
  }
  function openClaimBundle(ids:string[]){
   const eligible=cases.filter(c=>ids.includes(c.id)&&c.status==="Closed"&&c.dischargeRequest&&!c.billing);
   if(!eligible.length){setNotice("Pilih minimal satu discharge approved yang belum diajukan klaim.");return}
-  const first=eligible[0],m=members.find(x=>x.cardNo===first.memberId);
+  const first=eligible[0],m=members.find(x=>x.cardNo===first.memberId),profile=providerProfiles[first.providerCode||activeProvider.code]||defaultProviderProfiles[first.providerCode||activeProvider.code]||activeProviderProfile;
   const bundleId="BCL-"+new Date().toISOString().slice(2,10).replaceAll("-","")+"-"+String(Date.now()).slice(-5);
   const total=eligible.reduce((sum,x)=>sum+(x.dischargeRequest?.finalBill||0),0);
   setClaimDraft({
    receiptDate:new Date().toISOString().slice(0,10),product:m?.product||"Prokes",claimType:"Bundle Provider",reimbursementType:"",
-   bankName:"",applicantName:first.provider,participantName:eligible.length+" peserta",participantNo:"MULTI-CASE",
-   phone:"",email:"",description:"Bundle klaim "+first.provider+" ("+eligible.length+" case)",paymentMethod:"Transfer",
-   accountNo:"",accountName:"",applicationStatus:"Diajukan",submittedBy:first.provider,receivedBy:"",claimProkes:true,submittedAt:0,
+   bankName:profile?.bankName||"",applicantName:first.provider,participantName:eligible.length+" peserta",participantNo:"MULTI-CASE",
+   phone:profile?.phone||"",email:profile?.email||"",description:"Bundle klaim "+first.provider+" ("+eligible.length+" case)",paymentMethod:profile?.paymentMethod||"Transfer",
+   accountNo:profile?.accountNo||"",accountName:profile?.accountName||"",applicationStatus:"Diajukan",submittedBy:profile?.contactPerson||first.provider,receivedBy:"",claimProkes:true,submittedAt:0,
    documents:claimDocumentLabels.map(label=>({label,submitted:false,cs:false,cl:false,fa:false,remark:""})),
    bundleId,bundleCaseIds:eligible.map(x=>x.id),bundleTotalBill:total
   });
@@ -273,6 +297,7 @@ export default function Page(){
   <nav>
    <button className={view==="dashboard"?"active":""} onClick={()=>setView("dashboard")}><Activity size={18}/>Dashboard</button>
    {role==="provider"?<>
+    <button className={view==="profile"?"active":""} onClick={openProviderProfile}><Settings size={18}/>Profile Provider</button>
     <button className={view==="registration"?"active":""} onClick={()=>setView("registration")}><UserRound size={18}/>Pendaftaran Peserta</button>
     <button className={view==="treatment"?"active":""} onClick={()=>setView("treatment")}><Stethoscope size={18}/>Treatment Request</button>
     <button className={view==="discharge"?"active":""} onClick={()=>setView("discharge")}><FileCheck2 size={18}/>Discharge</button>
@@ -290,7 +315,7 @@ export default function Page(){
   <div className="sideFoot"><span>Prototype Mode</span><small>Browser data · No production DB</small></div>
  </aside>
  <main>
-  <header><div><h1>{role==="provider"?"Provider Dashboard":"Managed Care Command Center"}</h1><p>{role==="provider"?"Kelola pendaftaran, treatment, dan discharge peserta.":"Master peserta mengikuti struktur data Managed Care PertaLife."}</p></div><div className="switchWrap"><span className="switchLabel">Account Switcher</span><div className="account accountSelector"><div className="avatar">{role==="provider"?<Building2 size={18}/>:<ShieldCheck size={18}/>}</div><div className="accountSelectText"><b>{role==="provider"?activeProvider.name:"Call Center PertaLife"}</b><span>{role==="provider"?activeProvider.code:"Verifier 24/7"}</span></div><select aria-label="Account Switcher" value={role==="callcenter"?"callcenter":activeProvider.code} onChange={e=>{const v=e.target.value;if(v==="callcenter"){setRole("callcenter")}else{setRole("provider");setActiveProviderCode(v as typeof activeProviderCode)}setView("dashboard");setNotice("");setFound(null);setLookupDone(false)}}><option value="callcenter">Call Center PertaLife</option>{providerAccounts.map(p=><option key={p.code} value={p.code}>{p.name} — {p.code}</option>)}</select><ChevronDown size={17}/></div></div></header>
+  <header><div><h1>{role==="provider"?"Provider Dashboard":"Managed Care Command Center"}</h1><p>{role==="provider"?"Kelola pendaftaran, treatment, dan discharge peserta.":"Master peserta mengikuti struktur data Managed Care PertaLife."}</p></div><div className="switchWrap"><span className="switchLabel">Account Switcher</span><div className="account accountSelector"><div className="avatar">{role==="provider"?<Building2 size={18}/>:<ShieldCheck size={18}/>}</div><div className="accountSelectText"><b>{role==="provider"?activeProvider.name:"Call Center PertaLife"}</b><span>{role==="provider"?activeProvider.code:"Verifier 24/7"}</span></div><select aria-label="Account Switcher" value={role==="callcenter"?"callcenter":activeProvider.code} onChange={e=>{const v=e.target.value;if(v==="callcenter"){setRole("callcenter")}else{setRole("provider");setActiveProviderCode(v as typeof activeProviderCode)}setView("dashboard");setNotice("");setFound(null);setLookupDone(false);setProfileDraft(null)}}><option value="callcenter">Call Center PertaLife</option>{providerAccounts.map(p=><option key={p.code} value={p.code}>{p.name} — {p.code}</option>)}</select><ChevronDown size={17}/></div></div></header>
   {notice&&<div className="notice">{notice}</div>}
 
   {view==="dashboard"&&<section className="stats">
@@ -321,6 +346,33 @@ export default function Page(){
     {filteredMembers.length===0?<tr><td colSpan={9} className="emptyState"><b>Belum ada data peserta</b><small>Upload file Excel master peserta dari menu ini.</small></td></tr>:pageMembers.map(m=><tr key={m.cardNo}><td><b>{m.cardNo}</b><small>{m.membershipNo}</small></td><td><b>{m.name}</b><small>{relationLabel(m.relation)} · {m.gender||"-"} · {m.maritalStatus||"-"}</small></td><td><b>{m.employeeName||"-"}</b><small>{m.employeeMembershipNo||"-"}</small></td><td><b>{m.company}</b><small>{m.department||"-"}</small></td><td><b>{m.policyNo||"-"}</b><small>{m.product||"-"} · {m.planName||"-"} {m.planCode?"("+m.planCode+")":""}</small></td><td><b>{niceDate(m.inception||m.startDate)}</b><small>s.d. {niceDate(m.expiry||m.endDate)}</small></td><td><b>{faskesName(m)||"Belum dimapping"}</b><small>{faskesCode(m)||"-"}</small></td><td><span className={"statusDot "+(isActiveMember(m)?"ok":"no")}>{isActiveMember(m)?"Aktif":"Tidak Aktif"}</span></td><td><button className="rowDelete" onClick={()=>deleteMember(m.cardNo,m.name)}><Trash2 size={15}/>Hapus</button></td></tr>)}
    </tbody></table></div>
    {filteredMembers.length>0&&<div className="pagination"><span>Menampilkan {(safeMemberPage-1)*memberPageSize+1}-{Math.min(safeMemberPage*memberPageSize,filteredMembers.length)} dari {filteredMembers.length}</span><div><button disabled={safeMemberPage<=1} onClick={()=>setMemberPage(Math.max(1,safeMemberPage-1))}><ChevronLeft size={16}/>Sebelumnya</button><b>Halaman {safeMemberPage} / {memberPageCount}</b><button disabled={safeMemberPage>=memberPageCount} onClick={()=>setMemberPage(Math.min(memberPageCount,safeMemberPage+1))}>Berikutnya<ChevronRight size={16}/></button></div></div>}
+  </section>}
+
+  {role==="provider"&&view==="profile"&&profileDraft&&<section className="card providerProfile">
+   <div className="sectionHead"><div><h2>Profile Provider</h2><p>Data ini digunakan untuk kebutuhan operasional dan autofill pengajuan klaim.</p></div><span className="countPill">{activeProvider.code}</span></div>
+   <div className="profileSection">
+    <div className="profileSectionTitle"><Building2 size={18}/><div><b>Identitas Provider</b><span>Kode dan nama provider terkunci mengikuti akun provider.</span></div></div>
+    <div className="profileGrid">
+     <label>Provider Code<input value={profileDraft.providerCode} readOnly/></label>
+     <label>Provider Name<input value={profileDraft.providerName} readOnly/></label>
+     <label>Jenis Provider<select value={profileDraft.providerType} onChange={e=>setProfileDraft({...profileDraft,providerType:e.target.value})}><option>Rumah Sakit</option><option>Klinik</option><option>Puskesmas/FKTP</option><option>Dokter Praktik</option><option>Dokter Gigi</option><option>Laboratorium</option><option>Apotek</option></select></label>
+     <label>Kota<input value={profileDraft.city} onChange={e=>setProfileDraft({...profileDraft,city:e.target.value})} placeholder="Kota / Kabupaten"/></label>
+     <label className="full">Alamat Provider<textarea value={profileDraft.address} onChange={e=>setProfileDraft({...profileDraft,address:e.target.value})} placeholder="Alamat lengkap provider"/></label>
+     <label>PIC / Contact Person<input value={profileDraft.contactPerson} onChange={e=>setProfileDraft({...profileDraft,contactPerson:e.target.value})} placeholder="Nama PIC provider"/></label>
+     <label>Telepon<input value={profileDraft.phone} onChange={e=>setProfileDraft({...profileDraft,phone:e.target.value})} placeholder="Nomor telepon"/></label>
+     <label>Email<input type="email" value={profileDraft.email} onChange={e=>setProfileDraft({...profileDraft,email:e.target.value})} placeholder="Email provider"/></label>
+    </div>
+   </div>
+   <div className="profileSection bankProfile">
+    <div className="profileSectionTitle"><FileSpreadsheet size={18}/><div><b>Data Rekening Pembayaran</b><span>Akan otomatis terisi saat Provider membuat single claim maupun bundle claim.</span></div></div>
+    <div className="profileGrid">
+     <label>Metode Pembayaran<select value={profileDraft.paymentMethod} onChange={e=>setProfileDraft({...profileDraft,paymentMethod:e.target.value})}><option>Transfer</option><option>Giro</option></select></label>
+     <label>Nama Bank<input value={profileDraft.bankName} onChange={e=>setProfileDraft({...profileDraft,bankName:e.target.value})} placeholder="Contoh Bank Mandiri"/></label>
+     <label>No. Rekening<input inputMode="numeric" value={profileDraft.accountNo} onChange={e=>setProfileDraft({...profileDraft,accountNo:e.target.value.replace(/\D/g,"")})} placeholder="Nomor rekening"/></label>
+     <label>Atas Nama Rekening<input value={profileDraft.accountName} onChange={e=>setProfileDraft({...profileDraft,accountName:e.target.value})} placeholder="Nama pemilik rekening"/></label>
+    </div>
+   </div>
+   <div className="profileActions"><div>{profileDraft.updatedAt?<span>Terakhir disimpan {new Date(profileDraft.updatedAt).toLocaleString("id-ID")}</span>:<span>Profile belum pernah disimpan.</span>}</div><button className="primary" onClick={saveProviderProfile}><CheckCircle2 size={17}/>Simpan Profile</button></div>
   </section>}
 
   {role==="provider"&&(view==="dashboard"||view==="registration")&&<section className="card eligibility">
