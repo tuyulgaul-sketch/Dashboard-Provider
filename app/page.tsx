@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useMemo,useState} from "react";
-import {Activity,AlertTriangle,ArrowRight,Building2,CheckCircle2,ChevronDown,Clock3,Database,FileCheck2,FileSpreadsheet,HeartPulse,Plus,Search,ShieldCheck,Stethoscope,Upload,UserRound} from "lucide-react";
+import {Activity,AlertTriangle,ArrowRight,Building2,CheckCircle2,ChevronDown,Clock3,Database,FileCheck2,FileSpreadsheet,HeartPulse,Plus,Search,ShieldCheck,Stethoscope,Trash2,Upload,UserRound} from "lucide-react";
 
 type Role="provider"|"callcenter";
 type CaseStatus="Waiting Admission"|"Treatment Active"|"Waiting Treatment Approval"|"Waiting Discharge"|"Closed";
@@ -101,6 +101,17 @@ export default function Page(){
   setNotice(uploadReview.valid+" peserta berhasil diupload ke Master Peserta.");
   setUploadReview(null);
  }
+ function deleteMember(card:string,name:string){
+  if(!window.confirm("Hapus "+name+" ("+card+") dari Master Peserta? Case yang sudah pernah dibuat tidak ikut terhapus."))return;
+  setMembers(v=>v.filter(m=>m.cardNo!==card));
+  setNotice("Peserta "+name+" berhasil dihapus dari Master Peserta.");
+ }
+ function deleteAllMembers(){
+  if(!members.length)return;
+  if(!window.confirm("Hapus seluruh "+members.length+" data peserta dari Master Peserta? Case yang sudah pernah dibuat tidak ikut terhapus."))return;
+  setMembers([]);setUploadReview(null);setMemberQuery("");
+  setNotice("Seluruh data Master Peserta berhasil dihapus.");
+ }
  function lookup(){const m=members.find(x=>x.cardNo.toLowerCase()===cardNo.trim().toLowerCase())||null;setFound(m);setLookupDone(true);setUrgent(false);setUrgencyReason("");setUrgencyText("");setComplaint("");}
  function submitAdmission(){if(!found||!canSubmit)return;const id="MC-"+new Date().toISOString().slice(2,10).replaceAll("-","")+"-"+String(cases.length+1).padStart(4,"0");setCases(v=>[{id,name:found.name,memberId:found.cardNo,company:found.company,provider:PROVIDER,status:"Waiting Admission",urgent,submittedAt:Date.now(),issue:complaint,visitType,urgencyReason:urgent?(urgencyReason==="Lainnya"?urgencyText:urgencyReason):undefined,policyNo:found.policyNo,planName:found.planName},...v]);setNotice("Admission berhasil dikirim ke Call Center PertaLife.");setFound(null);setCardNo("");setLookupDone(false);setComplaint("");setUrgent(false);}
  const decide=(id:string,status:CaseStatus)=>setCases(v=>v.map(c=>c.id===id?{...c,status,submittedAt:Date.now()}:c));
@@ -132,7 +143,7 @@ export default function Page(){
   </section>}
 
   {role==="callcenter"&&(view==="dashboard"||view==="master"||view==="eligibility")&&<section className="card master">
-   <div className="sectionHead"><div><h2>Master Peserta Managed Care</h2><p>Struktur upload: 19 kolom master peserta existing. Lookup utama Provider menggunakan CARD NO.</p></div><span className="countPill">{members.length} peserta</span></div>
+   <div className="sectionHead"><div><h2>Master Peserta Managed Care</h2><p>Struktur upload: 19 kolom master peserta existing. Lookup utama Provider menggunakan CARD NO.</p></div><div className="masterHeadActions"><span className="countPill">{members.length} peserta</span>{members.length>0&&<button className="dangerBtn" onClick={deleteAllMembers}><Trash2 size={15}/>Hapus Semua</button>}</div></div>
    {(view==="dashboard"||view==="master")&&<>
     <div className="bulkBox"><div className="bulkIcon"><FileSpreadsheet/></div><div><b>Bulk Upload Data Peserta</b><span>POLICYNO, COMPANY, DEPARTMENT, START/END DATE, membership, data keluarga, CARD NO, PRODUCT, PLAN NAME, PLAN CODE.</span></div><div className="uploadControls"><label>Default Faskes 1 <input value={defaultFaskes} onChange={e=>setDefaultFaskes(e.target.value)} placeholder="Opsional, contoh RS Hermina Kemayoran"/></label><label className="uploadBtn"><Upload size={17}/>Pilih File Excel<input type="file" accept=".xlsx,.xls" onChange={bulkUpload}/></label></div></div>
     {uploadReview&&<div className="reviewPanel">
@@ -150,8 +161,8 @@ export default function Page(){
     </div>}
    </>}
    <div className="masterToolbar"><div className="search"><Search size={16}/><input value={memberQuery} onChange={e=>setMemberQuery(e.target.value)} placeholder="Cari CARD NO, nama, membership, pekerja, perusahaan..."/></div><small>{filteredMembers.length} dari {members.length} peserta</small></div>
-   <div className="miniTable"><table><thead><tr><th>Card / Membership</th><th>Peserta & Relasi</th><th>Pekerja</th><th>Perusahaan</th><th>Polis / Plan</th><th>Periode</th><th>Faskes 1</th><th>Status</th></tr></thead><tbody>
-    {filteredMembers.length===0?<tr><td colSpan={8} className="emptyState"><b>Belum ada data peserta</b><small>Upload file Excel master peserta dari menu ini.</small></td></tr>:filteredMembers.map(m=><tr key={m.cardNo}><td><b>{m.cardNo}</b><small>{m.membershipNo}</small></td><td><b>{m.name}</b><small>{relationLabel(m.relation)} · {m.gender||"-"} · {m.maritalStatus||"-"}</small></td><td><b>{m.employeeName||"-"}</b><small>{m.employeeMembershipNo||"-"}</small></td><td><b>{m.company}</b><small>{m.department||"-"}</small></td><td><b>{m.policyNo||"-"}</b><small>{m.product||"-"} · {m.planName||"-"} {m.planCode?"("+m.planCode+")":""}</small></td><td><b>{niceDate(m.inception||m.startDate)}</b><small>s.d. {niceDate(m.expiry||m.endDate)}</small></td><td><b>{m.faskes1||"Belum dimapping"}</b></td><td><span className={"statusDot "+(isActiveMember(m)?"ok":"no")}>{isActiveMember(m)?"Aktif":"Tidak Aktif"}</span></td></tr>)}
+   <div className="miniTable"><table><thead><tr><th>Card / Membership</th><th>Peserta & Relasi</th><th>Pekerja</th><th>Perusahaan</th><th>Polis / Plan</th><th>Periode</th><th>Faskes 1</th><th>Status</th><th>Aksi</th></tr></thead><tbody>
+    {filteredMembers.length===0?<tr><td colSpan={9} className="emptyState"><b>Belum ada data peserta</b><small>Upload file Excel master peserta dari menu ini.</small></td></tr>:filteredMembers.map(m=><tr key={m.cardNo}><td><b>{m.cardNo}</b><small>{m.membershipNo}</small></td><td><b>{m.name}</b><small>{relationLabel(m.relation)} · {m.gender||"-"} · {m.maritalStatus||"-"}</small></td><td><b>{m.employeeName||"-"}</b><small>{m.employeeMembershipNo||"-"}</small></td><td><b>{m.company}</b><small>{m.department||"-"}</small></td><td><b>{m.policyNo||"-"}</b><small>{m.product||"-"} · {m.planName||"-"} {m.planCode?"("+m.planCode+")":""}</small></td><td><b>{niceDate(m.inception||m.startDate)}</b><small>s.d. {niceDate(m.expiry||m.endDate)}</small></td><td><b>{m.faskes1||"Belum dimapping"}</b></td><td><span className={"statusDot "+(isActiveMember(m)?"ok":"no")}>{isActiveMember(m)?"Aktif":"Tidak Aktif"}</span></td><td><button className="rowDelete" onClick={()=>deleteMember(m.cardNo,m.name)}><Trash2 size={15}/>Hapus</button></td></tr>)}
    </tbody></table></div>
   </section>}
 
