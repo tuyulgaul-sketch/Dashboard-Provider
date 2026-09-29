@@ -11,12 +11,13 @@ type Member={
  product:string;planName:string;planCode:string;faskes1:string;
 };
 type CareCase={id:string;name:string;memberId:string;company:string;provider:string;status:CaseStatus;urgent:boolean;submittedAt:number;issue:string;visitType:string;urgencyReason?:string;policyNo?:string;planName?:string};
-type UploadIssue={row:number;cardNo:string;name:string;missing:string[];duplicate:boolean};
-type UploadReview={file:string;total:number;valid:number;incomplete:number;duplicate:number;unmappedFaskes:number;missingHeaders:string[];issues:UploadIssue[];staged:Member[]};
+type UploadIssue={row:number;cardNo:string;name:string;missingRequired:string[];missingOptional:string[];duplicate:boolean};
+type UploadReview={file:string;total:number;valid:number;incomplete:number;duplicate:number;optionalWarnings:number;unmappedFaskes:number;missingHeaders:string[];missingOptionalHeaders:string[];issues:UploadIssue[];staged:Member[]};
 
 const PROVIDER="RS Hermina Kemayoran";
 const urgencyOptions=["Kecelakaan","Kondisi akut / kegawatdaruratan","Di luar area Faskes 1","Faskes 1 tidak beroperasi","Emergency gigi - dokter gigi umum","Kondisi on-site di lokasi kerja","Lainnya"];
 const requiredHeaders=["POLICYNO","COMPANY","DEPARTMENT","START DATE","END DATE","MEMBERSHIP NO","MEMBER NAME","EMPLOYEE NAME","EMPLOYEE MEMBERSHIP NO","DOB","INCEPTION","EXPIRY","GENDER","MARITAL STATUS","RELATIONSHIP","CARD NO","PRODUCT","PLAN NAME"];
+const optionalReviewHeaders=["PLAN CODE"];
 
 function fmt(ms:number){const s=Math.max(0,Math.floor(ms/1000));return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
 function niceDate(v:string){if(!v)return "-";const d=new Date(v+"T00:00:00");return Number.isNaN(d.getTime())?v:new Intl.DateTimeFormat("id-ID",{day:"2-digit",month:"2-digit",year:"numeric"}).format(d)}
@@ -60,6 +61,7 @@ export default function Page(){
    const rows=XLSX.utils.sheet_to_json<Record<string,unknown>>(ws,{defval:""});
    const headerRow=(XLSX.utils.sheet_to_json<unknown[]>(ws,{header:1,defval:""})[0]||[]).map(v=>String(v).trim().toUpperCase());
    const missingHeaders=requiredHeaders.filter(h=>!headerRow.includes(h));
+   const missingOptionalHeaders=optionalReviewHeaders.filter(h=>!headerRow.includes(h));
    const asText=(v:unknown)=>String(v??"").trim();
    const asDate=(v:unknown)=>{
     if(!v)return "";
@@ -69,19 +71,21 @@ export default function Page(){
     return s.slice(0,10);
    };
    const existing=new Set(members.map(m=>m.cardNo.toLowerCase())),batch=new Set<string>();
-   let incomplete=0,duplicate=0,unmappedFaskes=0;
+   let incomplete=0,duplicate=0,optionalWarnings=0,unmappedFaskes=0;
    const staged:Member[]=[],issues:UploadIssue[]=[];
    rows.forEach((r,index)=>{
-    const missing=requiredHeaders.filter(h=>!asText(r[h]));
+    const missingRequired=requiredHeaders.filter(h=>!asText(r[h]));
+    const missingOptional=optionalReviewHeaders.filter(h=>!asText(r[h]));
     const card=asText(r["CARD NO"]),key=card.toLowerCase();
     const isDuplicate=!!card&&(existing.has(key)||batch.has(key));
     if(card&&!isDuplicate)batch.add(key);
-    if(missing.length)incomplete++;
+    if(missingRequired.length)incomplete++;
+    if(missingOptional.length)optionalWarnings++;
     if(isDuplicate)duplicate++;
-    if(missing.length||isDuplicate){
-     issues.push({row:index+2,cardNo:card||"-",name:asText(r["MEMBER NAME"])||"-",missing,duplicate:isDuplicate});
-     return;
+    if(missingRequired.length||missingOptional.length||isDuplicate){
+     issues.push({row:index+2,cardNo:card||"-",name:asText(r["MEMBER NAME"])||"-",missingRequired,missingOptional,duplicate:isDuplicate});
     }
+    if(missingRequired.length||isDuplicate)return;
     const rowFaskes=asText(r["FASKES 1"]||r["FASKES1"])||defaultFaskes.trim();if(!rowFaskes)unmappedFaskes++;
     staged.push({
      policyNo:asText(r["POLICYNO"]),company:asText(r["COMPANY"]),department:asText(r["DEPARTMENT"]),startDate:asDate(r["START DATE"]),endDate:asDate(r["END DATE"]),
@@ -89,7 +93,7 @@ export default function Page(){
      gender:asText(r["GENDER"]),maritalStatus:asText(r["MARITAL STATUS"]),relation:asText(r["RELATIONSHIP"]),cardNo:card,product:asText(r["PRODUCT"]),planName:asText(r["PLAN NAME"]),planCode:asText(r["PLAN CODE"]),faskes1:rowFaskes
     });
    });
-   setUploadReview({file:file.name,total:rows.length,valid:staged.length,incomplete,duplicate,unmappedFaskes,missingHeaders,issues,staged});
+   setUploadReview({file:file.name,total:rows.length,valid:staged.length,incomplete,duplicate,optionalWarnings,unmappedFaskes,missingHeaders,missingOptionalHeaders,issues,staged});
    setNotice("File berhasil dibaca. Review hasil validasi sebelum Confirm Upload.");
   }catch{
    setUploadReview(null);
@@ -157,10 +161,12 @@ export default function Page(){
       <div className="okReview"><span>Lengkap</span><strong>{uploadReview.valid}</strong></div>
       <div className={uploadReview.incomplete?"badReview":""}><span>Tidak Lengkap</span><strong>{uploadReview.incomplete}</strong></div>
       <div className={uploadReview.duplicate?"badReview":""}><span>Duplicate Card</span><strong>{uploadReview.duplicate}</strong></div>
+      <div className={uploadReview.optionalWarnings?"warnReview":""}><span>Warning Optional</span><strong>{uploadReview.optionalWarnings}</strong></div>
       <div className={uploadReview.unmappedFaskes?"warnReview":""}><span>Tanpa Faskes 1</span><strong>{uploadReview.unmappedFaskes}</strong></div>
      </div>
      {uploadReview.missingHeaders.length>0&&<div className="reviewBlocker"><AlertTriangle size={18}/><div><b>Header wajib belum lengkap</b><span>{uploadReview.missingHeaders.join(", ")}</span></div></div>}
-     {uploadReview.issues.length>0&&<div className="issueWrap"><div className="issueTitle"><b>Data yang harus diperbaiki</b><span>Menampilkan maksimal 100 issue pertama dari file.</span></div><table><thead><tr><th>Row Excel</th><th>Card No</th><th>Member Name</th><th>Masalah</th></tr></thead><tbody>{uploadReview.issues.slice(0,100).map((x,i)=><tr key={i}><td><b>{x.row}</b></td><td>{x.cardNo}</td><td>{x.name}</td><td>{x.missing.length>0&&<span className="issueTag">Kosong: {x.missing.join(", ")}</span>}{x.duplicate&&<span className="issueTag duplicateTag">Duplicate CARD NO</span>}</td></tr>)}</tbody></table></div>}
+     {uploadReview.missingOptionalHeaders.length>0&&<div className="reviewWarning"><AlertTriangle size={18}/><div><b>Header optional tidak ditemukan</b><span>{uploadReview.missingOptionalHeaders.join(", ")} — tidak memblokir upload.</span></div></div>}
+     {uploadReview.issues.length>0&&<div className="issueWrap"><div className="issueTitle"><b>Remark hasil validasi</b><span>Setiap row menampilkan seluruh kolom kosong sekaligus. PLAN CODE hanya warning dan tidak memblokir upload.</span></div><table><thead><tr><th>Row Excel</th><th>Card No</th><th>Member Name</th><th>Remark</th></tr></thead><tbody>{uploadReview.issues.slice(0,100).map((x,i)=>{const allMissing=[...x.missingRequired,...x.missingOptional];const parts=[];if(allMissing.length)parts.push("Kosong: "+allMissing.join(", "));if(x.duplicate)parts.push("Duplicate CARD NO");return <tr key={i}><td><b>{x.row}</b></td><td>{x.cardNo}</td><td>{x.name}</td><td><span className={x.missingRequired.length||x.duplicate?"remarkBlocker":"remarkWarning"}>{parts.join(" | ")}</span></td></tr>})}</tbody></table></div>}
      <div className="reviewActions"><span>{uploadReview.missingHeaders.length||uploadReview.incomplete||uploadReview.duplicate?<><AlertTriangle size={16}/> Upload dikunci sampai seluruh error diperbaiki.</>:<><CheckCircle2 size={16}/> Semua data lolos validasi dan siap diupload.</>}</span><button className="primary" disabled={uploadReview.missingHeaders.length>0||uploadReview.incomplete>0||uploadReview.duplicate>0||uploadReview.total===0} onClick={confirmUpload}><CheckCircle2 size={17}/>Confirm Upload {uploadReview.valid} Peserta</button></div>
     </div>}
    </>}
