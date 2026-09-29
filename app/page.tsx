@@ -8,15 +8,15 @@ type Member={
  policyNo:string;company:string;department:string;startDate:string;endDate:string;
  membershipNo:string;name:string;employeeName:string;employeeMembershipNo:string;dob:string;
  inception:string;expiry:string;gender:string;maritalStatus:string;relation:string;cardNo:string;
- product:string;planName:string;planCode:string;faskes1:string;
+ product:string;planName:string;planCode:string;faskes1Code:string;faskes1Name:string;faskes1?:string;
 };
 type CareCase={id:string;name:string;memberId:string;company:string;provider:string;status:CaseStatus;urgent:boolean;submittedAt:number;issue:string;visitType:string;urgencyReason?:string;policyNo?:string;planName?:string};
-type UploadIssue={row:number;cardNo:string;name:string;missingRequired:string[];missingOptional:string[];duplicate:boolean};
-type UploadReview={file:string;total:number;valid:number;incomplete:number;duplicate:number;optionalWarnings:number;unmappedFaskes:number;missingHeaders:string[];missingOptionalHeaders:string[];issues:UploadIssue[];staged:Member[]};
+type UploadPreviewRow={row:number;cardNo:string;name:string;missingRequired:string[];missingOptional:string[];duplicate:boolean};
+type UploadReview={file:string;total:number;valid:number;duplicate:number;optionalWarnings:number;missingHeaders:string[];missingOptionalHeaders:string[];previewRows:UploadPreviewRow[];staged:Member[]};
 
 const PROVIDER="RS Hermina Kemayoran";
 const urgencyOptions=["Kecelakaan","Kondisi akut / kegawatdaruratan","Di luar area Faskes 1","Faskes 1 tidak beroperasi","Emergency gigi - dokter gigi umum","Kondisi on-site di lokasi kerja","Lainnya"];
-const requiredHeaders=["POLICYNO","COMPANY","DEPARTMENT","START DATE","END DATE","MEMBERSHIP NO","MEMBER NAME","EMPLOYEE NAME","EMPLOYEE MEMBERSHIP NO","DOB","INCEPTION","EXPIRY","GENDER","MARITAL STATUS","RELATIONSHIP","CARD NO","PRODUCT","PLAN NAME"];
+const requiredHeaders=["POLICYNO","COMPANY","DEPARTMENT","START DATE","END DATE","MEMBERSHIP NO","MEMBER NAME","EMPLOYEE NAME","EMPLOYEE MEMBERSHIP NO","DOB","INCEPTION","EXPIRY","GENDER","MARITAL STATUS","RELATIONSHIP","CARD NO","PRODUCT","PLAN NAME","FASKES 1 CODE","FASKES 1 NAME"];
 const optionalReviewHeaders=["PLAN CODE"];
 
 function fmt(ms:number){const s=Math.max(0,Math.floor(ms/1000));return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
@@ -28,14 +28,16 @@ function isActiveMember(m:Member){
  return (!s||Number.isNaN(s.getTime())||today>=s)&&(!e||Number.isNaN(e.getTime())||today<=e);
 }
 function relationLabel(v:string){const r=v.toUpperCase();if(r==="EMPLOYEE")return "Pekerja";if(r==="SPOUSE")return "Pasangan";if(r==="CHILD")return "Anak";return v||"-"}
+function faskesName(m:Member){return m.faskes1Name||m.faskes1||""}
+function faskesCode(m:Member){return m.faskes1Code||""}
 
 export default function Page(){
  const [role,setRole]=useState<Role>("provider"),[now,setNow]=useState(Date.now()),[cases,setCases]=useState<CareCase[]>([]),[members,setMembers]=useState<Member[]>([]);
  const [query,setQuery]=useState(""),[memberQuery,setMemberQuery]=useState(""),[statusFilter,setStatusFilter]=useState<CaseStatus|"Open"|null>(null),[hydrated,setHydrated]=useState(false);
  const [cardNo,setCardNo]=useState(""),[visitType,setVisitType]=useState("Rawat Jalan"),[found,setFound]=useState<Member|null>(null),[lookupDone,setLookupDone]=useState(false);
  const [urgent,setUrgent]=useState(false),[urgencyReason,setUrgencyReason]=useState(""),[urgencyText,setUrgencyText]=useState(""),[complaint,setComplaint]=useState("");
- const [view,setView]=useState("dashboard"),[notice,setNotice]=useState(""),[defaultFaskes,setDefaultFaskes]=useState("");
- const [uploadReview,setUploadReview]=useState<UploadReview|null>(null); const [memberPage,setMemberPage]=useState(1); const [memberPageSize,setMemberPageSize]=useState(50);
+ const [view,setView]=useState("dashboard"),[notice,setNotice]=useState("");
+ const [uploadReview,setUploadReview]=useState<UploadReview|null>(null); const [reviewFilter,setReviewFilter]=useState("all"); const [memberPage,setMemberPage]=useState(1); const [memberPageSize,setMemberPageSize]=useState(50);
 
  useEffect(()=>{try{const m=localStorage.getItem("pertalife-managed-care-members-v2"),c=localStorage.getItem("pertalife-managed-care-cases");if(m)setMembers(JSON.parse(m));if(c)setCases(JSON.parse(c));}catch{}setHydrated(true);const t=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t)},[]);
  useEffect(()=>{if(hydrated)localStorage.setItem("pertalife-managed-care-members-v2",JSON.stringify(members));},[members,hydrated]);
@@ -47,9 +49,25 @@ export default function Page(){
  const memberPageCount=Math.max(1,Math.ceil(filteredMembers.length/memberPageSize));
  const safeMemberPage=Math.min(memberPage,memberPageCount);
  const pageMembers=useMemo(()=>filteredMembers.slice((safeMemberPage-1)*memberPageSize,safeMemberPage*memberPageSize),[filteredMembers,safeMemberPage,memberPageSize]);
+ const reviewMissingCounts=useMemo(()=>{
+  if(!uploadReview)return [] as [string,number][];
+  const counts=new Map<string,number>();
+  uploadReview.previewRows.forEach(r=>r.missingRequired.forEach(col=>counts.set(col,(counts.get(col)||0)+1)));
+  return Array.from(counts.entries()).sort((a,b)=>b[1]-a[1]);
+ },[uploadReview]);
+ const filteredPreviewRows=useMemo(()=>{
+  if(!uploadReview)return [];
+  if(reviewFilter==="valid")return uploadReview.previewRows.filter(r=>!r.missingRequired.length&&!r.duplicate);
+  if(reviewFilter==="duplicate")return uploadReview.previewRows.filter(r=>r.duplicate);
+  if(reviewFilter==="optional")return uploadReview.previewRows.filter(r=>r.missingOptional.length>0);
+  if(reviewFilter.startsWith("missing:")){const col=reviewFilter.slice(8);return uploadReview.previewRows.filter(r=>r.missingRequired.includes(col))}
+  return uploadReview.previewRows;
+ },[uploadReview,reviewFilter]);
  const active=!!found&&isActiveMember(found);
- const faskesMapped=!!found&&!!found.faskes1.trim();
- const faskesMatch=!!found&&found.faskes1.trim().toLowerCase()===PROVIDER.toLowerCase();
+ const foundFaskesName=found?faskesName(found):"";
+ const foundFaskesCode=found?faskesCode(found):"";
+ const faskesMapped=!!found&&!!foundFaskesName&&!!foundFaskesCode;
+ const faskesMatch=!!found&&foundFaskesName.trim().toLowerCase()===PROVIDER.toLowerCase();
  const canSubmit=!!found&&active&&!!complaint.trim()&&(faskesMatch||(urgent&&!!urgencyReason&&(urgencyReason!=="Lainnya"||!!urgencyText.trim())));
 
  async function bulkUpload(e:React.ChangeEvent<HTMLInputElement>){
@@ -71,39 +89,37 @@ export default function Page(){
     return s.slice(0,10);
    };
    const existing=new Set(members.map(m=>m.cardNo.toLowerCase())),batch=new Set<string>();
-   let incomplete=0,duplicate=0,optionalWarnings=0,unmappedFaskes=0;
-   const staged:Member[]=[],issues:UploadIssue[]=[];
+   let duplicate=0,optionalWarnings=0;
+   const staged:Member[]=[],previewRows:UploadPreviewRow[]=[];
    rows.forEach((r,index)=>{
     const missingRequired=requiredHeaders.filter(h=>!asText(r[h]));
     const missingOptional=optionalReviewHeaders.filter(h=>!asText(r[h]));
     const card=asText(r["CARD NO"]),key=card.toLowerCase();
     const isDuplicate=!!card&&(existing.has(key)||batch.has(key));
     if(card&&!isDuplicate)batch.add(key);
-    if(missingRequired.length)incomplete++;
     if(missingOptional.length)optionalWarnings++;
     if(isDuplicate)duplicate++;
-    if(missingRequired.length||missingOptional.length||isDuplicate){
-     issues.push({row:index+2,cardNo:card||"-",name:asText(r["MEMBER NAME"])||"-",missingRequired,missingOptional,duplicate:isDuplicate});
-    }
+    previewRows.push({row:index+2,cardNo:card||"-",name:asText(r["MEMBER NAME"])||"-",missingRequired,missingOptional,duplicate:isDuplicate});
     if(missingRequired.length||isDuplicate)return;
-    const rowFaskes=asText(r["FASKES 1"]||r["FASKES1"])||defaultFaskes.trim();if(!rowFaskes)unmappedFaskes++;
     staged.push({
      policyNo:asText(r["POLICYNO"]),company:asText(r["COMPANY"]),department:asText(r["DEPARTMENT"]),startDate:asDate(r["START DATE"]),endDate:asDate(r["END DATE"]),
      membershipNo:asText(r["MEMBERSHIP NO"]),name:asText(r["MEMBER NAME"]),employeeName:asText(r["EMPLOYEE NAME"]),employeeMembershipNo:asText(r["EMPLOYEE MEMBERSHIP NO"]),dob:asDate(r["DOB"]),inception:asDate(r["INCEPTION"]),expiry:asDate(r["EXPIRY"]),
-     gender:asText(r["GENDER"]),maritalStatus:asText(r["MARITAL STATUS"]),relation:asText(r["RELATIONSHIP"]),cardNo:card,product:asText(r["PRODUCT"]),planName:asText(r["PLAN NAME"]),planCode:asText(r["PLAN CODE"]),faskes1:rowFaskes
+     gender:asText(r["GENDER"]),maritalStatus:asText(r["MARITAL STATUS"]),relation:asText(r["RELATIONSHIP"]),cardNo:card,product:asText(r["PRODUCT"]),planName:asText(r["PLAN NAME"]),planCode:asText(r["PLAN CODE"]),faskes1Code:asText(r["FASKES 1 CODE"]),faskes1Name:asText(r["FASKES 1 NAME"])
     });
    });
-   setUploadReview({file:file.name,total:rows.length,valid:staged.length,incomplete,duplicate,optionalWarnings,unmappedFaskes,missingHeaders,missingOptionalHeaders,issues,staged});
+   setUploadReview({file:file.name,total:rows.length,valid:staged.length,duplicate,optionalWarnings,missingHeaders,missingOptionalHeaders,previewRows,staged});
+   setReviewFilter("all");
    setNotice("File berhasil dibaca. Review hasil validasi sebelum Confirm Upload.");
   }catch{
-   setUploadReview(null);
+   setUploadReview(null);setReviewFilter("all");
    setNotice("File Excel tidak dapat dibaca. Pastikan struktur kolom sesuai master peserta Managed Care.");
   }
   e.target.value="";
  }
  function confirmUpload(){
   if(!uploadReview)return;
-  const blocked=uploadReview.missingHeaders.length>0||uploadReview.incomplete>0||uploadReview.duplicate>0;
+  const incomplete=uploadReview.previewRows.some(r=>r.missingRequired.length>0);
+  const blocked=uploadReview.missingHeaders.length>0||incomplete||uploadReview.duplicate>0;
   if(blocked){setNotice("Upload diblokir. Perbaiki seluruh error pada file lalu pilih ulang file Excel.");return}
   setMembers(v=>[...uploadReview.staged,...v]);
   setNotice(uploadReview.valid+" peserta berhasil diupload ke Master Peserta.");
@@ -117,7 +133,7 @@ export default function Page(){
  function deleteAllMembers(){
   if(!members.length)return;
   if(!window.confirm("Hapus seluruh "+members.length+" data peserta dari Master Peserta? Case yang sudah pernah dibuat tidak ikut terhapus."))return;
-  setMembers([]);setUploadReview(null);setMemberQuery("");
+  setMembers([]);setUploadReview(null);setReviewFilter("all");setMemberQuery("");
   setNotice("Seluruh data Master Peserta berhasil dihapus.");
  }
  function lookup(){const m=members.find(x=>x.cardNo.toLowerCase()===cardNo.trim().toLowerCase())||null;setFound(m);setLookupDone(true);setUrgent(false);setUrgencyReason("");setUrgencyText("");setComplaint("");}
@@ -151,28 +167,27 @@ export default function Page(){
   </section>}
 
   {role==="callcenter"&&(view==="dashboard"||view==="master"||view==="eligibility")&&<section className="card master">
-   <div className="sectionHead"><div><h2>Master Peserta Managed Care</h2><p>Struktur upload: 19 kolom master peserta existing. Lookup utama Provider menggunakan CARD NO. PLAN CODE bersifat opsional.</p></div><div className="masterHeadActions"><span className="countPill">{members.length} peserta</span>{members.length>0&&<button className="dangerBtn" onClick={deleteAllMembers}><Trash2 size={15}/>Hapus Semua</button>}</div></div>
+   <div className="sectionHead"><div><h2>Master Peserta Managed Care</h2><p>Struktur upload: 21 kolom master peserta. FASKES 1 CODE & FASKES 1 NAME wajib, PLAN CODE opsional.</p></div><div className="masterHeadActions"><span className="countPill">{members.length} peserta</span>{members.length>0&&<button className="dangerBtn" onClick={deleteAllMembers}><Trash2 size={15}/>Hapus Semua</button>}</div></div>
    {(view==="dashboard"||view==="master")&&<>
-    <div className="bulkBox"><div className="bulkIcon"><FileSpreadsheet/></div><div><b>Bulk Upload Data Peserta</b><span>POLICYNO, COMPANY, DEPARTMENT, START/END DATE, membership, data keluarga, CARD NO, PRODUCT, PLAN NAME, PLAN CODE.</span></div><div className="uploadControls"><label>Default Faskes 1 <input value={defaultFaskes} onChange={e=>setDefaultFaskes(e.target.value)} placeholder="Opsional, contoh RS Hermina Kemayoran"/></label><label className="uploadBtn"><Upload size={17}/>Pilih File Excel<input type="file" accept=".xlsx,.xls" onChange={bulkUpload}/></label></div></div>
+    <div className="bulkBox"><div className="bulkIcon"><FileSpreadsheet/></div><div><b>Bulk Upload Data Peserta</b><span>21 kolom termasuk FASKES 1 CODE dan FASKES 1 NAME. PLAN CODE boleh kosong.</span></div><div className="uploadControls"><label className="uploadBtn"><Upload size={17}/>Pilih File Excel<input type="file" accept=".xlsx,.xls" onChange={bulkUpload}/></label></div></div>
     {uploadReview&&<div className="reviewPanel">
      <div className="reviewHead"><div><b>Review Upload: {uploadReview.file}</b><span>Data belum masuk Master Peserta sampai lo menekan Confirm Upload.</span></div><button className="reviewClear" onClick={()=>setUploadReview(null)}>Batalkan Review</button></div>
-     <div className="reviewStats">
-      <div><span>Total Row</span><strong>{uploadReview.total}</strong></div>
-      <div className="okReview"><span>Lengkap</span><strong>{uploadReview.valid}</strong></div>
-      <div className={uploadReview.incomplete?"badReview":""}><span>Tidak Lengkap</span><strong>{uploadReview.incomplete}</strong></div>
-      <div className={uploadReview.duplicate?"badReview":""}><span>Duplicate Card</span><strong>{uploadReview.duplicate}</strong></div>
-      <div className={uploadReview.optionalWarnings?"warnReview":""}><span>Warning Optional</span><strong>{uploadReview.optionalWarnings}</strong></div>
-      <div className={uploadReview.unmappedFaskes?"warnReview":""}><span>Tanpa Faskes 1</span><strong>{uploadReview.unmappedFaskes}</strong></div>
+     <div className="reviewStats reviewStatsClickable">
+      <button className={reviewFilter==="all"?"selectedReview":""} onClick={()=>setReviewFilter("all")}><span>Total Row</span><strong>{uploadReview.total}</strong></button>
+      <button className={"okReview "+(reviewFilter==="valid"?"selectedReview":"")} onClick={()=>setReviewFilter("valid")}><span>Lolos Validasi</span><strong>{uploadReview.valid}</strong></button>
+      {reviewMissingCounts.map(([col,count])=><button key={col} className={"badReview "+(reviewFilter==="missing:"+col?"selectedReview":"")} onClick={()=>setReviewFilter("missing:"+col)}><span>{col}</span><strong>{count}</strong></button>)}
+      {uploadReview.duplicate>0&&<button className={"badReview "+(reviewFilter==="duplicate"?"selectedReview":"")} onClick={()=>setReviewFilter("duplicate")}><span>Duplicate CARD NO</span><strong>{uploadReview.duplicate}</strong></button>}
+      {uploadReview.optionalWarnings>0&&<button className={"warnReview "+(reviewFilter==="optional"?"selectedReview":"")} onClick={()=>setReviewFilter("optional")}><span>PLAN CODE (Optional)</span><strong>{uploadReview.optionalWarnings}</strong></button>}
      </div>
      {uploadReview.missingHeaders.length>0&&<div className="reviewBlocker"><AlertTriangle size={18}/><div><b>Header wajib belum lengkap</b><span>{uploadReview.missingHeaders.join(", ")}</span></div></div>}
      {uploadReview.missingOptionalHeaders.length>0&&<div className="reviewWarning"><AlertTriangle size={18}/><div><b>Header optional tidak ditemukan</b><span>{uploadReview.missingOptionalHeaders.join(", ")} — tidak memblokir upload.</span></div></div>}
-     {uploadReview.issues.length>0&&<div className="issueWrap"><div className="issueTitle"><b>Remark hasil validasi</b><span>Setiap row menampilkan seluruh kolom kosong sekaligus. PLAN CODE hanya warning dan tidak memblokir upload.</span></div><table><thead><tr><th>Row Excel</th><th>Card No</th><th>Member Name</th><th>Remark</th></tr></thead><tbody>{uploadReview.issues.slice(0,100).map((x,i)=>{const allMissing=[...x.missingRequired,...x.missingOptional];const parts=[];if(allMissing.length)parts.push("Kosong: "+allMissing.join(", "));if(x.duplicate)parts.push("Duplicate CARD NO");return <tr key={i}><td><b>{x.row}</b></td><td>{x.cardNo}</td><td>{x.name}</td><td><span className={x.missingRequired.length||x.duplicate?"remarkBlocker":"remarkWarning"}>{parts.join(" | ")}</span></td></tr>})}</tbody></table></div>}
-     <div className="reviewActions"><span>{uploadReview.missingHeaders.length||uploadReview.incomplete||uploadReview.duplicate?<><AlertTriangle size={16}/> Upload dikunci sampai seluruh error diperbaiki.</>:<><CheckCircle2 size={16}/> Semua data lolos validasi dan siap diupload.</>}</span><button className="primary" disabled={uploadReview.missingHeaders.length>0||uploadReview.incomplete>0||uploadReview.duplicate>0||uploadReview.total===0} onClick={confirmUpload}><CheckCircle2 size={17}/>Confirm Upload {uploadReview.valid} Peserta</button></div>
+     <div className="issueWrap"><div className="issueTitle"><b>Preview Data Excel</b><span>{reviewFilter==="all"?"Semua row":reviewFilter==="valid"?"Hanya row yang lolos validasi":reviewFilter==="duplicate"?"Hanya duplicate CARD NO":reviewFilter==="optional"?"Hanya row dengan PLAN CODE kosong":"Hanya row dengan "+reviewFilter.replace("missing:","")+" kosong"} · menampilkan maksimal 100 row.</span></div><table><thead><tr><th>Row Excel</th><th>Card No</th><th>Member Name</th><th>Remark</th></tr></thead><tbody>{filteredPreviewRows.length===0?<tr><td colSpan={4} className="emptyState"><b>Tidak ada data pada filter ini</b></td></tr>:filteredPreviewRows.slice(0,100).map((x,i)=>{const parts=[];if(x.missingRequired.length)parts.push("Kosong wajib: "+x.missingRequired.join(", "));if(x.missingOptional.length)parts.push("Kosong optional: "+x.missingOptional.join(", "));if(x.duplicate)parts.push("Duplicate CARD NO");if(!parts.length)parts.push("Lolos validasi");return <tr key={i}><td><b>{x.row}</b></td><td>{x.cardNo}</td><td>{x.name}</td><td><span className={x.missingRequired.length||x.duplicate?"remarkBlocker":x.missingOptional.length?"remarkWarning":"remarkOk"}>{parts.join(" | ")}</span></td></tr>})}</tbody></table></div>
+     <div className="reviewActions"><span>{uploadReview.missingHeaders.length||uploadReview.previewRows.some(r=>r.missingRequired.length>0)||uploadReview.duplicate?<><AlertTriangle size={16}/> Upload dikunci sampai seluruh kolom wajib lengkap dan CARD NO unik.</>:<><CheckCircle2 size={16}/> Semua data wajib lolos validasi. PLAN CODE boleh kosong.</>}</span><button className="primary" disabled={uploadReview.missingHeaders.length>0||uploadReview.previewRows.some(r=>r.missingRequired.length>0)||uploadReview.duplicate>0||uploadReview.total===0} onClick={confirmUpload}><CheckCircle2 size={17}/>Confirm Upload {uploadReview.valid} Peserta</button></div>
     </div>}
    </>}
    <div className="masterToolbar"><div className="search"><Search size={16}/><input value={memberQuery} onChange={e=>{setMemberQuery(e.target.value);setMemberPage(1)}} placeholder="Cari CARD NO, nama, membership, pekerja, perusahaan..."/></div><div className="masterToolbarRight"><small>{filteredMembers.length} dari {members.length} peserta</small><label>Tampilkan <select value={memberPageSize} onChange={e=>{setMemberPageSize(Number(e.target.value));setMemberPage(1)}}><option value={50}>50</option><option value={100}>100</option><option value={250}>250</option></select></label></div></div>
    <div className="miniTable"><table><thead><tr><th>Card / Membership</th><th>Peserta & Relasi</th><th>Pekerja</th><th>Perusahaan</th><th>Polis / Plan</th><th>Periode</th><th>Faskes 1</th><th>Status</th><th>Aksi</th></tr></thead><tbody>
-    {filteredMembers.length===0?<tr><td colSpan={9} className="emptyState"><b>Belum ada data peserta</b><small>Upload file Excel master peserta dari menu ini.</small></td></tr>:pageMembers.map(m=><tr key={m.cardNo}><td><b>{m.cardNo}</b><small>{m.membershipNo}</small></td><td><b>{m.name}</b><small>{relationLabel(m.relation)} · {m.gender||"-"} · {m.maritalStatus||"-"}</small></td><td><b>{m.employeeName||"-"}</b><small>{m.employeeMembershipNo||"-"}</small></td><td><b>{m.company}</b><small>{m.department||"-"}</small></td><td><b>{m.policyNo||"-"}</b><small>{m.product||"-"} · {m.planName||"-"} {m.planCode?"("+m.planCode+")":""}</small></td><td><b>{niceDate(m.inception||m.startDate)}</b><small>s.d. {niceDate(m.expiry||m.endDate)}</small></td><td><b>{m.faskes1||"Belum dimapping"}</b></td><td><span className={"statusDot "+(isActiveMember(m)?"ok":"no")}>{isActiveMember(m)?"Aktif":"Tidak Aktif"}</span></td><td><button className="rowDelete" onClick={()=>deleteMember(m.cardNo,m.name)}><Trash2 size={15}/>Hapus</button></td></tr>)}
+    {filteredMembers.length===0?<tr><td colSpan={9} className="emptyState"><b>Belum ada data peserta</b><small>Upload file Excel master peserta dari menu ini.</small></td></tr>:pageMembers.map(m=><tr key={m.cardNo}><td><b>{m.cardNo}</b><small>{m.membershipNo}</small></td><td><b>{m.name}</b><small>{relationLabel(m.relation)} · {m.gender||"-"} · {m.maritalStatus||"-"}</small></td><td><b>{m.employeeName||"-"}</b><small>{m.employeeMembershipNo||"-"}</small></td><td><b>{m.company}</b><small>{m.department||"-"}</small></td><td><b>{m.policyNo||"-"}</b><small>{m.product||"-"} · {m.planName||"-"} {m.planCode?"("+m.planCode+")":""}</small></td><td><b>{niceDate(m.inception||m.startDate)}</b><small>s.d. {niceDate(m.expiry||m.endDate)}</small></td><td><b>{faskesName(m)||"Belum dimapping"}</b><small>{faskesCode(m)||"-"}</small></td><td><span className={"statusDot "+(isActiveMember(m)?"ok":"no")}>{isActiveMember(m)?"Aktif":"Tidak Aktif"}</span></td><td><button className="rowDelete" onClick={()=>deleteMember(m.cardNo,m.name)}><Trash2 size={15}/>Hapus</button></td></tr>)}
    </tbody></table></div>
    {filteredMembers.length>0&&<div className="pagination"><span>Menampilkan {(safeMemberPage-1)*memberPageSize+1}-{Math.min(safeMemberPage*memberPageSize,filteredMembers.length)} dari {filteredMembers.length}</span><div><button disabled={safeMemberPage<=1} onClick={()=>setMemberPage(Math.max(1,safeMemberPage-1))}><ChevronLeft size={16}/>Sebelumnya</button><b>Halaman {safeMemberPage} / {memberPageCount}</b><button disabled={safeMemberPage>=memberPageCount} onClick={()=>setMemberPage(Math.min(memberPageCount,safeMemberPage+1))}>Berikutnya<ChevronRight size={16}/></button></div></div>}
   </section>}
@@ -182,7 +197,7 @@ export default function Page(){
    <div className="eligGrid"><label>Card No<input value={cardNo} onChange={e=>setCardNo(e.target.value)} placeholder="Contoh CARD-DUMMY-000001"/></label><label>Jenis Kunjungan<select value={visitType} onChange={e=>setVisitType(e.target.value)}><option>Rawat Jalan</option><option>UGD / IGD</option><option>Emergency Gigi</option></select></label><button className="primary" onClick={lookup}><Search size={17}/>Cek Eligibility</button></div>
    {lookupDone&&!found&&<div className="result bad"><AlertTriangle/><div><b>Peserta tidak ditemukan</b><span>Pastikan CARD NO sudah masuk melalui bulk upload PertaLife.</span></div></div>}
    {found&&<div className="eligResult">
-    <div className="resultTop"><div><span className={"statusDot "+(active?"ok":"no")}>{active?"COVERAGE AKTIF":"COVERAGE TIDAK AKTIF"}</span><h3>{found.name}</h3><p>{found.cardNo} · {found.membershipNo}</p></div><div className={"matchBox "+(faskesMatch?"match":"mismatch")}><b>{!faskesMapped?"Faskes 1 Belum Dimapping":faskesMatch?"Faskes 1 Sesuai":"Faskes 1 Tidak Sesuai"}</b><span>{found.faskes1||"Mapping diperlukan oleh PertaLife"}</span></div></div>
+    <div className="resultTop"><div><span className={"statusDot "+(active?"ok":"no")}>{active?"COVERAGE AKTIF":"COVERAGE TIDAK AKTIF"}</span><h3>{found.name}</h3><p>{found.cardNo} · {found.membershipNo}</p></div><div className={"matchBox "+(faskesMatch?"match":"mismatch")}><b>{!faskesMapped?"Faskes 1 Belum Dimapping":faskesMatch?"Faskes 1 Sesuai":"Faskes 1 Tidak Sesuai"}</b><span>{foundFaskesName||"Mapping diperlukan oleh PertaLife"}{foundFaskesCode?" · "+foundFaskesCode:""}</span></div></div>
     <div className="detailGrid detailGridWide">
      <div><span>Perusahaan</span><b>{found.company||"-"}</b></div><div><span>Department</span><b>{found.department||"-"}</b></div><div><span>Relationship</span><b>{relationLabel(found.relation)}</b></div>
      <div><span>Employee</span><b>{found.employeeName||"-"}</b></div><div><span>Employee Membership</span><b>{found.employeeMembershipNo||"-"}</b></div><div><span>DOB</span><b>{niceDate(found.dob)}</b></div>
