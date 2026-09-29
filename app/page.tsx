@@ -16,7 +16,7 @@ type UploadReview={file:string;total:number;valid:number;incomplete:number;dupli
 
 const PROVIDER="RS Hermina Kemayoran";
 const urgencyOptions=["Kecelakaan","Kondisi akut / kegawatdaruratan","Di luar area Faskes 1","Faskes 1 tidak beroperasi","Emergency gigi - dokter gigi umum","Kondisi on-site di lokasi kerja","Lainnya"];
-const requiredHeaders=["POLICYNO","COMPANY","DEPARTMENT","START DATE","END DATE","MEMBERSHIP NO","MEMBER NAME","EMPLOYEE NAME","EMPLOYEE MEMBERSHIP NO","DOB","INCEPTION","EXPIRY","GENDER","MARITAL STATUS","RELATIONSHIP","CARD NO","PRODUCT","PLAN NAME","PLAN CODE"];
+const requiredHeaders=["POLICYNO","COMPANY","DEPARTMENT","START DATE","END DATE","MEMBERSHIP NO","MEMBER NAME","EMPLOYEE NAME","EMPLOYEE MEMBERSHIP NO","DOB","INCEPTION","EXPIRY","GENDER","MARITAL STATUS","RELATIONSHIP","CARD NO","PRODUCT","PLAN NAME"];
 
 function fmt(ms:number){const s=Math.max(0,Math.floor(ms/1000));return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
 function niceDate(v:string){if(!v)return "-";const d=new Date(v+"T00:00:00");return Number.isNaN(d.getTime())?v:new Intl.DateTimeFormat("id-ID",{day:"2-digit",month:"2-digit",year:"numeric"}).format(d)}
@@ -147,7 +147,7 @@ export default function Page(){
   </section>}
 
   {role==="callcenter"&&(view==="dashboard"||view==="master"||view==="eligibility")&&<section className="card master">
-   <div className="sectionHead"><div><h2>Master Peserta Managed Care</h2><p>Struktur upload: 19 kolom master peserta existing. Lookup utama Provider menggunakan CARD NO.</p></div><div className="masterHeadActions"><span className="countPill">{members.length} peserta</span>{members.length>0&&<button className="dangerBtn" onClick={deleteAllMembers}><Trash2 size={15}/>Hapus Semua</button>}</div></div>
+   <div className="sectionHead"><div><h2>Master Peserta Managed Care</h2><p>Struktur upload: 19 kolom master peserta existing. Lookup utama Provider menggunakan CARD NO. PLAN CODE bersifat opsional.</p></div><div className="masterHeadActions"><span className="countPill">{members.length} peserta</span>{members.length>0&&<button className="dangerBtn" onClick={deleteAllMembers}><Trash2 size={15}/>Hapus Semua</button>}</div></div>
    {(view==="dashboard"||view==="master")&&<>
     <div className="bulkBox"><div className="bulkIcon"><FileSpreadsheet/></div><div><b>Bulk Upload Data Peserta</b><span>POLICYNO, COMPANY, DEPARTMENT, START/END DATE, membership, data keluarga, CARD NO, PRODUCT, PLAN NAME, PLAN CODE.</span></div><div className="uploadControls"><label>Default Faskes 1 <input value={defaultFaskes} onChange={e=>setDefaultFaskes(e.target.value)} placeholder="Opsional, contoh RS Hermina Kemayoran"/></label><label className="uploadBtn"><Upload size={17}/>Pilih File Excel<input type="file" accept=".xlsx,.xls" onChange={bulkUpload}/></label></div></div>
     {uploadReview&&<div className="reviewPanel">
