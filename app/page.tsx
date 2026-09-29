@@ -21,6 +21,7 @@ type ClaimSubmission={
  paymentMethod:string;accountNo:string;accountName:string;applicationStatus:string;submittedBy:string;receivedBy:string;
  claimProkes:boolean;submittedAt:number;documents:ClaimDocument[];bundleId?:string;bundleCaseIds?:string[];bundleTotalBill?:number;
 };
+type CaseHistory={at:number;actor:string;event:string;detail?:string};
 type CareCase={id:string;name:string;memberId:string;company:string;provider:string;providerCode?:string;status:CaseStatus;urgent:boolean;submittedAt:number;issue:string;visitType:string;urgencyReason?:string;policyNo?:string;planName?:string;
  treatmentRequest?:{diagnosis:string;procedure:string;medication:string;reason?:string;attachments?:string[];estimatedCost:number;submittedAt:number};
  treatmentApproval?:{doctor:string;note:string;approvedAt:number};
@@ -29,6 +30,7 @@ type CareCase={id:string;name:string;memberId:string;company:string;provider:str
  confirmation?:{stage:"Admission"|"Treatment"|"Discharge";reason:string;requestedAt:number;response?:string;respondedAt?:number};
  billing?:{status:"Submitted"|"Under Verification"|"Approved"|"Scheduled for Payment"|"Paid";submittedAt:number;updatedAt:number;reminderCount:number;lastReminderAt?:number};
  claimSubmission?:ClaimSubmission;
+ history?:CaseHistory[];
 };
 type UploadPreviewRow={row:number;cardNo:string;name:string;missingRequired:string[];missingOptional:string[];duplicate:boolean};
 type UploadReview={file:string;total:number;valid:number;duplicate:number;optionalWarnings:number;missingHeaders:string[];missingOptionalHeaders:string[];previewRows:UploadPreviewRow[];staged:Member[]};
@@ -169,6 +171,21 @@ function faskesCode(m:Member){return m.faskes1Code||""}
 function formatAmountInput(v:string){const digits=v.replace(/\D/g,"");return digits?Number(digits).toLocaleString("id-ID"):""}
 function parseAmount(v:string){return Number(v.replace(/\D/g,""))||0}
 function formatRupiah(v:number){return "Rp "+Math.max(0,v||0).toLocaleString("id-ID")}
+function withHistory(c:CareCase,event:string,actor:string,detail?:string,at=Date.now()):CareCase{
+ return {...c,history:[...(c.history||[]),{at,actor,event,detail}]};
+}
+function fallbackHistory(c:CareCase):CaseHistory[]{
+ const h:CaseHistory[]=[];
+ if(c.treatmentRequest)h.push({at:c.treatmentRequest.submittedAt,actor:c.provider,event:"Treatment Request Submitted",detail:c.treatmentRequest.diagnosis});
+ if(c.treatmentApproval)h.push({at:c.treatmentApproval.approvedAt,actor:"dr. "+c.treatmentApproval.doctor+" / PertaLife",event:"Treatment Approved",detail:c.treatmentApproval.note});
+ if(c.dischargeRequest)h.push({at:c.dischargeRequest.submittedAt,actor:c.provider,event:"Discharge Submitted",detail:c.dischargeRequest.finalDiagnosis+" · "+formatRupiah(c.dischargeRequest.finalBill)});
+ if(c.dischargeApproval)h.push({at:c.dischargeApproval.approvedAt,actor:"dr. "+c.dischargeApproval.doctor+" / PertaLife",event:"Final Discharge Approved",detail:c.dischargeApproval.note});
+ if(c.confirmation)h.push({at:c.confirmation.requestedAt,actor:"Call Center PertaLife",event:"Need Confirmation - "+c.confirmation.stage,detail:c.confirmation.reason});
+ if(c.confirmation?.respondedAt)h.push({at:c.confirmation.respondedAt,actor:c.provider,event:"Confirmation Response",detail:c.confirmation.response});
+ if(c.claimSubmission?.submittedAt)h.push({at:c.claimSubmission.submittedAt,actor:c.provider,event:"Claim Submitted",detail:c.claimSubmission.bundleId||c.id});
+ if(c.billing?.updatedAt)h.push({at:c.billing.updatedAt,actor:"PertaLife",event:"Payment Status: "+c.billing.status});
+ return h.sort((a,b)=>a.at-b.at);
+}
 
 export default function Page(){
  const [role,setRole]=useState<Role>("provider"),[activeProviderCode,setActiveProviderCode]=useState(providerAccounts[0].code),[now,setNow]=useState(Date.now()),[cases,setCases]=useState<CareCase[]>([]),[members,setMembers]=useState<Member[]>([]);
@@ -197,8 +214,17 @@ export default function Page(){
  },[bankSearch]);
  const visibleCases=useMemo(()=>role==="provider"?cases.filter(c=>c.providerCode===activeProvider.code||(!c.providerCode&&c.provider===activeProvider.name)):cases,[cases,role,activeProvider.code,activeProvider.name]);
  const waiting=useMemo(()=>visibleCases.filter(c=>c.status.startsWith("Waiting")),[visibleCases]);
- const filtered=visibleCases.filter(c=>(c.name+" "+c.memberId+" "+c.company+" "+c.id).toLowerCase().includes(query.toLowerCase())).filter(c=>statusFilter==="Open"?c.status!=="Closed":statusFilter?c.status===statusFilter:true);
+ const filtered=visibleCases.filter(c=>(c.name+" "+c.memberId+" "+c.company+" "+c.id).toLowerCase().includes(query.toLowerCase())).filter(c=>{
+  if(statusFilter==="Open")return c.status!=="Closed";
+  if(statusFilter)return c.status===statusFilter;
+  if(role==="provider"&&view==="registration")return c.status==="Waiting Admission";
+  if(role==="provider"&&view==="treatment")return ["Treatment Active","Waiting Treatment Approval","Treatment Approved"].includes(c.status);
+  if(role==="provider"&&view==="discharge")return ["Treatment Approved","Waiting Discharge"].includes(c.status);
+  if(role==="provider"&&view==="cases")return c.status!=="Closed";
+  return true;
+ });
  const selectedCase=selectedCaseId?cases.find(c=>c.id===selectedCaseId)||null:null;
+ const selectedHistory=selectedCase?(selectedCase.history?.length?selectedCase.history:fallbackHistory(selectedCase)):[];
  const dischargeHistory=useMemo(()=>visibleCases.filter(c=>!!c.dischargeRequest).sort((a,b)=>(b.dischargeRequest?.submittedAt||0)-(a.dischargeRequest?.submittedAt||0)),[visibleCases]);
  const filteredMembers=useMemo(()=>members.filter(m=>(m.cardNo+" "+m.name+" "+m.membershipNo+" "+m.employeeName+" "+m.employeeMembershipNo+" "+m.company+" "+m.department+" "+m.policyNo).toLowerCase().includes(memberQuery.toLowerCase())),[members,memberQuery]);
  const memberPageCount=Math.max(1,Math.ceil(filteredMembers.length/memberPageSize));
@@ -292,32 +318,32 @@ export default function Page(){
   setNotice("Seluruh data Master Peserta berhasil dihapus.");
  }
  function lookup(){const m=members.find(x=>x.cardNo.toLowerCase()===cardNo.trim().toLowerCase())||null;setFound(m);setLookupDone(true);setUrgent(false);setUrgencyReason("");setUrgencyText("");setComplaint("");}
- function submitAdmission(){if(!found||!canSubmit)return;const id="MC-"+new Date().toISOString().slice(2,10).replaceAll("-","")+"-"+String(cases.length+1).padStart(4,"0");setCases(v=>[{id,name:found.name,memberId:found.cardNo,company:found.company,provider:activeProvider.name,providerCode:activeProvider.code,status:"Waiting Admission",urgent,submittedAt:Date.now(),issue:complaint,visitType,urgencyReason:urgent?(urgencyReason==="Lainnya"?urgencyText:urgencyReason):undefined,policyNo:found.policyNo,planName:found.planName},...v]);setNotice("Admission berhasil dikirim ke Call Center PertaLife.");setFound(null);setCardNo("");setLookupDone(false);setComplaint("");setUrgent(false);}
+ function submitAdmission(){if(!found||!canSubmit)return;const id="MC-"+new Date().toISOString().slice(2,10).replaceAll("-","")+"-"+String(cases.length+1).padStart(4,"0");const at=Date.now();setCases(v=>[{id,name:found.name,memberId:found.cardNo,company:found.company,provider:activeProvider.name,providerCode:activeProvider.code,status:"Waiting Admission",urgent,submittedAt:at,issue:complaint,visitType,urgencyReason:urgent?(urgencyReason==="Lainnya"?urgencyText:urgencyReason):undefined,policyNo:found.policyNo,planName:found.planName,history:[{at,actor:activeProvider.name,event:"Admission Submitted",detail:complaint}]},...v]);setNotice("Admission berhasil dikirim ke Call Center PertaLife.");setFound(null);setCardNo("");setLookupDone(false);setComplaint("");setUrgent(false);}
  function openCaseDetail(id:string){setSelectedCaseId(id);setShowCaseDetail(true)}
  function openTreatment(id:string){setSelectedCaseId(id);setTreatmentDiagnosis("");setTreatmentProcedure("");setTreatmentMedication("");setTreatmentCost("");setTreatmentReason("");setTreatmentAttachments([]);setView("treatment");setShowCaseDetail(false)}
  function submitTreatment(){
   if(!selectedCase||!treatmentDiagnosis.trim()||!treatmentProcedure.trim()||!treatmentReason.trim()||!treatmentCost.trim())return;
-  setCases(v=>v.map(c=>c.id===selectedCase.id?{...c,status:"Waiting Treatment Approval",submittedAt:Date.now(),treatmentRequest:{diagnosis:treatmentDiagnosis.trim(),procedure:treatmentProcedure.trim(),medication:treatmentMedication.trim(),reason:treatmentReason.trim(),attachments:treatmentAttachments,estimatedCost:parseAmount(treatmentCost),submittedAt:Date.now()}}:c));
+  const at=Date.now();setCases(v=>v.map(c=>c.id===selectedCase.id?withHistory({...c,status:"Waiting Treatment Approval",submittedAt:at,treatmentRequest:{diagnosis:treatmentDiagnosis.trim(),procedure:treatmentProcedure.trim(),medication:treatmentMedication.trim(),reason:treatmentReason.trim(),attachments:treatmentAttachments,estimatedCost:parseAmount(treatmentCost),submittedAt:at}},"Treatment Request Submitted",c.provider,treatmentDiagnosis.trim(),at):c));
   setNotice("Treatment Request berhasil dikirim ke Call Center PertaLife.");
   setView("dashboard");setSelectedCaseId(null);
  }
  function openDischarge(id:string){setSelectedCaseId(id);setFinalDiagnosis("");setFinalBill("");setDischargeNotes("");setView("discharge");setShowCaseDetail(false)}
  function submitDischarge(){
   if(!selectedCase||!finalDiagnosis.trim()||!finalBill.trim())return;
-  setCases(v=>v.map(c=>c.id===selectedCase.id?{...c,status:"Waiting Discharge",submittedAt:Date.now(),dischargeRequest:{finalDiagnosis:finalDiagnosis.trim(),finalBill:parseAmount(finalBill),notes:dischargeNotes.trim(),submittedAt:Date.now()}}:c));
+  const at=Date.now();setCases(v=>v.map(c=>c.id===selectedCase.id?withHistory({...c,status:"Waiting Discharge",submittedAt:at,dischargeRequest:{finalDiagnosis:finalDiagnosis.trim(),finalBill:parseAmount(finalBill),notes:dischargeNotes.trim(),submittedAt:at}},"Discharge Submitted",c.provider,finalDiagnosis.trim()+" · "+formatRupiah(parseAmount(finalBill)),at):c));
   setNotice("Discharge Request berhasil dikirim ke Call Center PertaLife.");
   setView("dashboard");setSelectedCaseId(null);
  }
  function requestConfirmation(id:string,stage:"Admission"|"Treatment"|"Discharge"){
   const reason=window.prompt("Masukkan alasan Need Confirmation untuk Provider:");
   if(!reason||!reason.trim())return;
-  setCases(v=>v.map(c=>c.id===id?{...c,confirmation:{stage,reason:reason.trim(),requestedAt:Date.now()},submittedAt:Date.now()}:c));
+  const at=Date.now();setCases(v=>v.map(c=>c.id===id?withHistory({...c,confirmation:{stage,reason:reason.trim(),requestedAt:at},submittedAt:at},"Need Confirmation - "+stage,"Call Center PertaLife",reason.trim(),at):c));
   setNotice("Need Confirmation dikirim ke Provider.");
  }
  function respondConfirmation(id:string){
   const response=window.prompt("Masukkan respons / klarifikasi untuk PertaLife:");
   if(!response||!response.trim())return;
-  setCases(v=>v.map(c=>c.id===id&&c.confirmation?{...c,confirmation:{...c.confirmation,response:response.trim(),respondedAt:Date.now()},submittedAt:Date.now()}:c));
+  const at=Date.now();setCases(v=>v.map(c=>c.id===id&&c.confirmation?withHistory({...c,confirmation:{...c.confirmation,response:response.trim(),respondedAt:at},submittedAt:at},"Confirmation Response",c.provider,response.trim(),at):c));
   setNotice("Klarifikasi berhasil dikirim ke Call Center PertaLife.");
  }
  function openProviderProfile(){
@@ -366,7 +392,7 @@ export default function Page(){
   }
   const submittedAt=Date.now();
   const bundleIds=claimDraft.bundleCaseIds?.length?claimDraft.bundleCaseIds:[selectedCase.id];
-  setCases(v=>v.map(c=>bundleIds.includes(c.id)?{...c,claimSubmission:{...claimDraft,applicationStatus:"Diterima",submittedAt},billing:{status:"Submitted",submittedAt,updatedAt:submittedAt,reminderCount:0}}:c));
+  setCases(v=>v.map(c=>bundleIds.includes(c.id)?withHistory({...c,claimSubmission:{...claimDraft,applicationStatus:"Diterima",submittedAt},billing:{status:"Submitted",submittedAt,updatedAt:submittedAt,reminderCount:0}},"Claim Submitted",c.provider,(claimDraft.bundleId||c.id)+" · "+formatRupiah(c.dischargeRequest?.finalBill||0),submittedAt):c));
   setNotice("Bundle klaim "+(claimDraft.bundleId||"")+" berhasil dikirim ke PertaLife ("+bundleIds.length+" case).");
   setClaimDraft(null);setSelectedCaseId(null);setSelectedClaimCases([]);setView("history");
  }
@@ -377,11 +403,11 @@ export default function Page(){
   setCases(v=>v.map(c=>c.id===caseId&&c.claimSubmission?{...c,claimSubmission:{...c.claimSubmission,...patch}}:c));
  }
  function sendPaymentReminder(id:string){
-  setCases(v=>v.map(c=>c.id===id&&c.billing&&c.billing.status!=="Paid"?{...c,billing:{...c.billing,reminderCount:(c.billing.reminderCount||0)+1,lastReminderAt:Date.now(),updatedAt:Date.now()}}:c));
+  const at=Date.now();setCases(v=>v.map(c=>c.id===id&&c.billing&&c.billing.status!=="Paid"?withHistory({...c,billing:{...c.billing,reminderCount:(c.billing.reminderCount||0)+1,lastReminderAt:at,updatedAt:at}},"Payment Reminder Sent",c.provider,"Reminder ke PertaLife",at):c));
   setNotice("Reminder pembayaran berhasil dikirim ke PertaLife.");
  }
  function advanceBilling(id:string,status:"Under Verification"|"Approved"|"Scheduled for Payment"|"Paid"){
-  setCases(v=>v.map(c=>c.id===id&&c.billing?{...c,billing:{...c.billing,status,updatedAt:Date.now()}}:c));
+  const at=Date.now();setCases(v=>v.map(c=>c.id===id&&c.billing?withHistory({...c,billing:{...c.billing,status,updatedAt:at}},"Payment Status Updated","PertaLife",status,at):c));
  }
  function approveMedical(id:string,stage:"Treatment"|"Discharge"){
   const doctor=window.prompt("Nama dokter PertaLife yang memberikan approval:");
@@ -389,10 +415,10 @@ export default function Page(){
   const note=window.prompt("Catatan approval / pertimbangan medis:");
   if(note===null||!note.trim())return;
   const at=Date.now();
-  setCases(v=>v.map(c=>c.id===id?stage==="Treatment"?{...c,status:"Treatment Approved",treatmentApproval:{doctor:doctor.trim(),note:note.trim(),approvedAt:at},confirmation:undefined,submittedAt:at}:{...c,status:"Closed",dischargeApproval:{doctor:doctor.trim(),note:note.trim(),approvedAt:at},confirmation:undefined,submittedAt:at}:c));
+  setCases(v=>v.map(c=>c.id===id?stage==="Treatment"?withHistory({...c,status:"Treatment Approved",treatmentApproval:{doctor:doctor.trim(),note:note.trim(),approvedAt:at},confirmation:undefined,submittedAt:at},"Treatment Approved","dr. "+doctor.trim()+" / PertaLife",note.trim(),at):withHistory({...c,status:"Closed",dischargeApproval:{doctor:doctor.trim(),note:note.trim(),approvedAt:at},confirmation:undefined,submittedAt:at},"Final Discharge Approved","dr. "+doctor.trim()+" / PertaLife",note.trim(),at):c));
   setNotice((stage==="Treatment"?"Treatment":"Final discharge")+" disetujui oleh dr. "+doctor.trim()+".");
  }
- const decide=(id:string,status:CaseStatus)=>setCases(v=>v.map(c=>c.id===id?{...c,status,confirmation:undefined,submittedAt:Date.now()}:c));
+ const decide=(id:string,status:CaseStatus)=>{const at=Date.now();setCases(v=>v.map(c=>c.id===id?withHistory({...c,status,confirmation:undefined,submittedAt:at},status==="Treatment Active"?"Admission Approved":"Status Updated","Call Center PertaLife",status,at):c));};
 
  return <div className="shell">
  <aside>
@@ -401,14 +427,15 @@ export default function Page(){
    <button className={view==="dashboard"?"active":""} onClick={()=>setView("dashboard")}><Activity size={18}/>Dashboard</button>
    {role==="provider"?<>
     <button className={view==="profile"?"active":""} onClick={openProviderProfile}><Settings size={18}/>Profile Provider</button>
-    <button className={view==="registration"?"active":""} onClick={()=>setView("registration")}><UserRound size={18}/>Pendaftaran Peserta</button>
-    <button className={view==="treatment"?"active":""} onClick={()=>setView("treatment")}><Stethoscope size={18}/>Treatment Request</button>
-    <button className={view==="discharge"?"active":""} onClick={()=>setView("discharge")}><FileCheck2 size={18}/>Discharge</button>
+    <button className={view==="registration"?"active":""} onClick={()=>{setView("registration");setStatusFilter(null)}}><UserRound size={18}/>Pendaftaran Peserta</button>
+    <button className={view==="treatment"?"active":""} onClick={()=>{setView("treatment");setStatusFilter(null)}}><Stethoscope size={18}/>Treatment Request</button>
+    <button className={view==="discharge"?"active":""} onClick={()=>{setView("discharge");setStatusFilter(null)}}><FileCheck2 size={18}/>Discharge</button>
+    <button className={view==="cases"?"active":""} onClick={()=>{setView("cases");setStatusFilter(null)}}><Activity size={18}/>Case Peserta</button>
     <button className={view==="history"?"active":""} onClick={()=>setView("history")}><Clock3 size={18}/>Riwayat Discharge</button>
     <button className={view==="claim"?"active":""} onClick={()=>setView("history")}><FileSpreadsheet size={18}/>Pengajuan Klaim</button>
    </>:<>
     <button className={view==="master"?"active":""} onClick={()=>setView("master")}><Database size={18}/>Master Peserta</button>
-    <button className={view==="queue"?"active":""} onClick={()=>setView("queue")}><Clock3 size={18}/>Verification Queue</button>
+    <button className={view==="queue"?"active":""} onClick={()=>{setView("queue");setStatusFilter(null)}}><Clock3 size={18}/>Verification Queue</button>
     <button className={view==="eligibility"?"active":""} onClick={()=>setView("eligibility")}><ShieldCheck size={18}/>Eligibility Review</button>
     <button className={view==="history"?"active":""} onClick={()=>setView("history")}><Clock3 size={18}/>Riwayat Discharge</button>
     <button className={view==="claim"?"active":""} onClick={()=>setView("history")}><FileSpreadsheet size={18}/>Klaim Provider</button>
@@ -422,7 +449,7 @@ export default function Page(){
   {notice&&<div className="notice">{notice}</div>}
 
   {view==="dashboard"&&<section className="stats">
-   {([["Waiting Admission","Waiting Admission",UserRound],["Waiting Treatment","Waiting Treatment Approval",Stethoscope],["Waiting Discharge","Waiting Discharge",FileCheck2],["Open Cases","Open",Activity]] as const).map(([label,key,Icon])=><button key={label} className={"card stat "+(statusFilter===key?"selected":"")} onClick={()=>{setStatusFilter(statusFilter===key?null:key);setTimeout(()=>document.getElementById("case-queue")?.scrollIntoView({behavior:"smooth",block:"start"}),0)}}><div><span>{label}</span><strong>{key==="Open"?visibleCases.filter(c=>c.status!=="Closed").length:visibleCases.filter(c=>c.status===key).length}</strong></div><div className="icon"><Icon/></div></button>)}
+   {([["Waiting Admission","Waiting Admission",UserRound,role==="callcenter"?"queue":"registration"],["Waiting Treatment","Waiting Treatment Approval",Stethoscope,role==="callcenter"?"queue":"treatment"],["Waiting Discharge","Waiting Discharge",FileCheck2,role==="callcenter"?"queue":"discharge"],["Open Cases","Open",Activity,role==="callcenter"?"queue":"cases"]] as const).map(([label,key,Icon,target])=><button key={label} className="card stat" onClick={()=>{setStatusFilter(key);setView(target);setTimeout(()=>document.getElementById("case-queue")?.scrollIntoView({behavior:"smooth",block:"start"}),0)}}><div><span>{label}</span><strong>{key==="Open"?visibleCases.filter(c=>c.status!=="Closed").length:visibleCases.filter(c=>c.status===key).length}</strong></div><div className="icon"><Icon/></div></button>)}
   </section>}
 
   {role==="callcenter"&&view==="master"&&<section className="card master">
@@ -572,6 +599,18 @@ export default function Page(){
     {selectedCase.confirmation&&<><div><span>Need Confirmation</span><b>{selectedCase.confirmation.stage}: {selectedCase.confirmation.reason}</b></div><div><span>Respons Provider</span><b>{selectedCase.confirmation.response||"Belum ada respons"}</b></div></>}
     {selectedCase.billing&&<><div><span>Status Pembayaran</span><b>{selectedCase.billing.status}</b></div><div><span>Reminder</span><b>{selectedCase.billing.reminderCount||0} kali</b></div></>}
    </div>
+   <div className="caseEvidence">
+    <div className="caseSubhead"><Upload size={17}/><div><b>Lampiran Case</b><span>Dokumen/foto yang dikirim Provider pada treatment dan klaim.</span></div></div>
+    <div className="evidenceList">
+     {selectedCase.treatmentRequest?.attachments?.length?selectedCase.treatmentRequest.attachments.map(name=><span key={"tr-"+name}><FileSpreadsheet size={14}/>{name}<small>Treatment</small></span>):null}
+     {selectedCase.claimSubmission?.documents?.filter(d=>d.fileName).map(d=><span key={"cl-"+d.label}><FileSpreadsheet size={14}/>{d.fileName}<small>{d.label}</small></span>)}
+     {!selectedCase.treatmentRequest?.attachments?.length&&!selectedCase.claimSubmission?.documents?.some(d=>d.fileName)&&<div className="emptyEvidence">Belum ada lampiran pada case ini.</div>}
+    </div>
+   </div>
+   <div className="caseTimeline">
+    <div className="caseSubhead"><Clock3 size={17}/><div><b>History Log Case</b><span>Jejak submit, verifikasi, approval, klaim, reminder, dan pembayaran.</span></div></div>
+    <div className="timelineList">{selectedHistory.length===0?<div className="emptyEvidence">Belum ada history log yang dapat ditampilkan.</div>:selectedHistory.slice().sort((a,b)=>b.at-a.at).map((h,i)=><div className="timelineItem" key={h.at+"-"+i}><div className="timelineDot"></div><div><b>{h.event}</b><span>{h.actor} · {new Date(h.at).toLocaleString("id-ID")}</span>{h.detail&&<p>{h.detail}</p>}</div></div>)}</div>
+   </div>
   </section>}
 
   {view==="history"&&<section className="card dischargeHistory">
@@ -581,10 +620,10 @@ export default function Page(){
    </tbody></table></div>
   </section>}
 
-  {(view==="dashboard"||view==="queue"||view==="treatment"||view==="discharge"||view==="audit")&&<section id="case-queue" className="card queue">
-   <div className="sectionHead"><div><h2>{role==="provider"?"Case Peserta":"Real-time Verification Queue"}</h2><p>{role==="provider"?"Pantau status verifikasi setiap case yang disubmit.":"Semua admission tetap harus diverifikasi PertaLife."}</p></div><div className="search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Cari case, nama, CARD NO..."/></div></div>
+  {(view==="dashboard"||view==="queue"||view==="registration"||view==="treatment"||view==="discharge"||view==="cases"||view==="audit")&&<section id="case-queue" className="card queue">
+   <div className="sectionHead"><div><h2>{role==="provider"?(view==="registration"?"Admission / Pendaftaran":view==="treatment"?"Treatment Cases":view==="discharge"?"Discharge Cases":"Case Peserta"):"Real-time Verification Queue"}</h2><p>{role==="provider"?"Data case mengikuti menu yang sedang dibuka.":"Buka detail case sebelum melakukan verifikasi bila perlu."}</p></div><div className="search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Cari case, nama, CARD NO..."/></div></div>
    <div className="tableWrap"><table><thead><tr><th>Case</th><th>Peserta</th><th>Provider / Perusahaan</th><th>Polis / Plan</th><th>Status</th><th>SLA</th><th>Aksi</th></tr></thead><tbody>
-    {filtered.length===0?<tr><td colSpan={7} className="emptyState"><b>{visibleCases.length===0?"Belum ada case":"Tidak ada case pada filter ini"}</b><small>{visibleCases.length===0?"Case akan muncul setelah Provider submit admission.":"Klik card aktif lagi untuk menghapus filter."}</small></td></tr>:filtered.map(c=><tr key={c.id}><td><b>{c.id}</b><small>{c.issue}</small></td><td><b>{c.name}</b><small>{c.memberId}</small></td><td><b>{c.provider}</b><small>{c.company}</small></td><td><b>{c.policyNo||"-"}</b><small>{c.planName||"-"}</small></td><td><span className={"badge "+(c.urgent?"urgent":"")}>{c.urgent&&<AlertTriangle size={13}/>} {c.status}</span>{c.urgencyReason&&<small>Urgent: {c.urgencyReason}</small>}{c.confirmation&&<small className="confirmationText">Need Confirmation ({c.confirmation.stage}): {c.confirmation.reason}{c.confirmation.response?" · Respons: "+c.confirmation.response:""}</small>}</td><td>{c.status==="Closed"?<span className="slaDone"><CheckCircle2 size={14}/>Selesai</span>:<span className="sla"><Clock3 size={14}/>{fmt(now-c.submittedAt)}</span>}</td><td>{role==="provider"?<div className="actions providerActions"><button onClick={()=>openCaseDetail(c.id)}><Eye size={15}/>Lihat Detail</button>{c.status==="Treatment Active"&&<button className="approve" onClick={()=>openTreatment(c.id)}><Stethoscope size={15}/>Buat Treatment Request</button>}{c.status==="Treatment Approved"&&<button className="approve" onClick={()=>openDischarge(c.id)}><FileCheck2 size={15}/>Ajukan Discharge</button>}{c.status==="Waiting Admission"&&<span className="waitingText">Menunggu Verifikasi PertaLife</span>}{c.status==="Waiting Treatment Approval"&&<span className="waitingText">Menunggu Approval Treatment</span>}{c.status==="Waiting Discharge"&&<span className="waitingText">Menunggu Verifikasi Discharge</span>}{c.confirmation&&!c.confirmation.response&&<button className="confirmReply" onClick={()=>respondConfirmation(c.id)}>Tanggapi Konfirmasi</button>}</div>:c.status==="Waiting Admission"?<div className="actions"><button className="approve" onClick={()=>decide(c.id,"Treatment Active")}><CheckCircle2 size={15}/>Approve Admission</button><button onClick={()=>requestConfirmation(c.id,"Admission")}>Need Confirmation</button><button>Reject</button></div>:c.status==="Waiting Treatment Approval"?<div className="actions"><button className="approve" onClick={()=>approveMedical(c.id,"Treatment")}><CheckCircle2 size={15}/>Approve Treatment</button><button onClick={()=>requestConfirmation(c.id,"Treatment")}>Need Confirmation</button><button>Reject</button></div>:c.status==="Waiting Discharge"?<div className="actions"><button className="approve" onClick={()=>approveMedical(c.id,"Discharge")}><CheckCircle2 size={15}/>Approve Discharge</button><button onClick={()=>requestConfirmation(c.id,"Discharge")}>Need Confirmation</button><button>Reject</button></div>:<span className="muted">No action</span>}</td></tr>)}
+    {filtered.length===0?<tr><td colSpan={7} className="emptyState"><b>{visibleCases.length===0?"Belum ada case":"Tidak ada case pada filter ini"}</b><small>{visibleCases.length===0?"Case akan muncul setelah Provider submit admission.":"Klik card aktif lagi untuk menghapus filter."}</small></td></tr>:filtered.map(c=><tr key={c.id}><td><b>{c.id}</b><small>{c.issue}</small></td><td><b>{c.name}</b><small>{c.memberId}</small></td><td><b>{c.provider}</b><small>{c.company}</small></td><td><b>{c.policyNo||"-"}</b><small>{c.planName||"-"}</small></td><td><span className={"badge "+(c.urgent?"urgent":"")}>{c.urgent&&<AlertTriangle size={13}/>} {c.status}</span>{c.urgencyReason&&<small>Urgent: {c.urgencyReason}</small>}{c.confirmation&&<small className="confirmationText">Need Confirmation ({c.confirmation.stage}): {c.confirmation.reason}{c.confirmation.response?" · Respons: "+c.confirmation.response:""}</small>}</td><td>{c.status==="Closed"?<span className="slaDone"><CheckCircle2 size={14}/>Selesai</span>:<span className="sla"><Clock3 size={14}/>{fmt(now-c.submittedAt)}</span>}</td><td>{role==="provider"?<div className="actions providerActions"><button onClick={()=>openCaseDetail(c.id)}><Eye size={15}/>Lihat Detail</button>{c.status==="Treatment Active"&&<button className="approve" onClick={()=>openTreatment(c.id)}><Stethoscope size={15}/>Buat Treatment Request</button>}{c.status==="Treatment Approved"&&<button className="approve" onClick={()=>openDischarge(c.id)}><FileCheck2 size={15}/>Ajukan Discharge</button>}{c.status==="Waiting Admission"&&<span className="waitingText">Menunggu Verifikasi PertaLife</span>}{c.status==="Waiting Treatment Approval"&&<span className="waitingText">Menunggu Approval Treatment</span>}{c.status==="Waiting Discharge"&&<span className="waitingText">Menunggu Verifikasi Discharge</span>}{c.confirmation&&!c.confirmation.response&&<button className="confirmReply" onClick={()=>respondConfirmation(c.id)}>Tanggapi Konfirmasi</button>}</div>:c.status==="Waiting Admission"?<div className="actions"><button onClick={()=>openCaseDetail(c.id)}><Eye size={15}/>Lihat Detail</button><button className="approve" onClick={()=>decide(c.id,"Treatment Active")}><CheckCircle2 size={15}/>Approve Admission</button><button onClick={()=>requestConfirmation(c.id,"Admission")}>Need Confirmation</button><button>Reject</button></div>:c.status==="Waiting Treatment Approval"?<div className="actions"><button onClick={()=>openCaseDetail(c.id)}><Eye size={15}/>Lihat Detail</button><button className="approve" onClick={()=>approveMedical(c.id,"Treatment")}><CheckCircle2 size={15}/>Approve Treatment</button><button onClick={()=>requestConfirmation(c.id,"Treatment")}>Need Confirmation</button><button>Reject</button></div>:c.status==="Waiting Discharge"?<div className="actions"><button onClick={()=>openCaseDetail(c.id)}><Eye size={15}/>Lihat Detail</button><button className="approve" onClick={()=>approveMedical(c.id,"Discharge")}><CheckCircle2 size={15}/>Approve Discharge</button><button onClick={()=>requestConfirmation(c.id,"Discharge")}>Need Confirmation</button><button>Reject</button></div>:<div className="actions"><button onClick={()=>openCaseDetail(c.id)}><Eye size={15}/>Lihat Detail</button><span className="muted">No action</span></div>}</td></tr>)}
    </tbody></table></div>
   </section>}
   {role==="callcenter"&&(view==="dashboard"||view==="queue")&&<section className="hint"><ShieldCheck/><div><b>Semua case tetap memerlukan verifikasi PertaLife.</b><span>Eligibility hanya membantu review; tidak ada auto-approval.</span></div><b>{waiting.length} waiting</b></section>}
