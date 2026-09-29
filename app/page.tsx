@@ -10,11 +10,19 @@ type Member={
  inception:string;expiry:string;gender:string;maritalStatus:string;relation:string;cardNo:string;
  product:string;planName:string;planCode:string;faskes1Code:string;faskes1Name:string;faskes1?:string;
 };
+type ClaimDocument={label:string;submitted:boolean;fileName?:string;cs:boolean;cl:boolean;fa:boolean;remark:string};
+type ClaimSubmission={
+ receiptDate:string;product:string;claimType:string;reimbursementType:string;bankName:string;
+ applicantName:string;participantName:string;participantNo:string;phone:string;email:string;description:string;
+ paymentMethod:string;accountNo:string;accountName:string;applicationStatus:string;submittedBy:string;receivedBy:string;
+ claimProkes:boolean;submittedAt:number;documents:ClaimDocument[];
+};
 type CareCase={id:string;name:string;memberId:string;company:string;provider:string;providerCode?:string;status:CaseStatus;urgent:boolean;submittedAt:number;issue:string;visitType:string;urgencyReason?:string;policyNo?:string;planName?:string;
  treatmentRequest?:{diagnosis:string;procedure:string;medication:string;estimatedCost:number;submittedAt:number};
  dischargeRequest?:{finalDiagnosis:string;finalBill:number;notes:string;submittedAt:number};
  confirmation?:{stage:"Admission"|"Treatment"|"Discharge";reason:string;requestedAt:number;response?:string;respondedAt?:number};
  billing?:{status:"Submitted"|"Under Verification"|"Approved"|"Scheduled for Payment"|"Paid";submittedAt:number;updatedAt:number;reminderCount:number;lastReminderAt?:number};
+ claimSubmission?:ClaimSubmission;
 };
 type UploadPreviewRow={row:number;cardNo:string;name:string;missingRequired:string[];missingOptional:string[];duplicate:boolean};
 type UploadReview={file:string;total:number;valid:number;duplicate:number;optionalWarnings:number;missingHeaders:string[];missingOptionalHeaders:string[];previewRows:UploadPreviewRow[];staged:Member[]};
@@ -26,6 +34,20 @@ const providerAccounts=[
 const urgencyOptions=["Kecelakaan","Kondisi akut / kegawatdaruratan","Di luar area Faskes 1","Faskes 1 tidak beroperasi","Emergency gigi - dokter gigi umum","Kondisi on-site di lokasi kerja","Lainnya"];
 const requiredHeaders=["POLICYNO","COMPANY","DEPARTMENT","START DATE","END DATE","MEMBERSHIP NO","MEMBER NAME","EMPLOYEE NAME","EMPLOYEE MEMBERSHIP NO","DOB","INCEPTION","EXPIRY","GENDER","MARITAL STATUS","RELATIONSHIP","CARD NO","PRODUCT","PLAN NAME","FASKES 1 CODE","FASKES 1 NAME"];
 const optionalReviewHeaders=["PLAN CODE"];
+const claimDocumentLabels=[
+ "Fotokopi Kartu Peserta / No. Eligible / No. Pegawai",
+ "Formulir Keterangan Medis Rawat Jalan",
+ "Surat Jaminan Rawat Inap dari Provider",
+ "Formulir Keterangan Medis Rawat Inap (Perorangan)",
+ "Resume Medis Rawat Inap",
+ "Perincian Biaya Rawat Inap",
+ "Kwitansi Asli",
+ "Fotokopi Resep di belakang Kwitansi / Copy Resep",
+ "Jenis Pemeriksaan Lab, Rontgen dan Pemeriksaan Medis",
+ "Fotokopi Surat Kelahiran / Kematian",
+ "Surat Rujukan",
+ "Resep Asli / Carbonized (Provider)"
+];
 
 function fmt(ms:number){const s=Math.max(0,Math.floor(ms/1000));return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
 function niceDate(v:string){if(!v)return "-";const d=new Date(v+"T00:00:00");return Number.isNaN(d.getTime())?v:new Intl.DateTimeFormat("id-ID",{day:"2-digit",month:"2-digit",year:"numeric"}).format(d)}
@@ -51,6 +73,7 @@ export default function Page(){
  const [selectedCaseId,setSelectedCaseId]=useState<string|null>(null),[showCaseDetail,setShowCaseDetail]=useState(false);
  const [treatmentDiagnosis,setTreatmentDiagnosis]=useState(""),[treatmentProcedure,setTreatmentProcedure]=useState(""),[treatmentMedication,setTreatmentMedication]=useState(""),[treatmentCost,setTreatmentCost]=useState("");
  const [finalDiagnosis,setFinalDiagnosis]=useState(""),[finalBill,setFinalBill]=useState(""),[dischargeNotes,setDischargeNotes]=useState("");
+ const [claimDraft,setClaimDraft]=useState<ClaimSubmission|null>(null);
  const [uploadReview,setUploadReview]=useState<UploadReview|null>(null); const [reviewFilter,setReviewFilter]=useState("all"); const [memberPage,setMemberPage]=useState(1); const [memberPageSize,setMemberPageSize]=useState(50);
 
  useEffect(()=>{try{const m=localStorage.getItem("pertalife-managed-care-members-v2"),c=localStorage.getItem("pertalife-managed-care-cases");if(m)setMembers(JSON.parse(m));if(c)setCases(JSON.parse(c));}catch{}setHydrated(true);const t=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t)},[]);
@@ -183,9 +206,50 @@ export default function Page(){
   setCases(v=>v.map(c=>c.id===id&&c.confirmation?{...c,confirmation:{...c.confirmation,response:response.trim(),respondedAt:Date.now()},submittedAt:Date.now()}:c));
   setNotice("Klarifikasi berhasil dikirim ke Call Center PertaLife.");
  }
- function requestPayment(id:string){
-  setCases(v=>v.map(c=>c.id===id&&c.dischargeRequest?{...c,billing:{status:"Submitted",submittedAt:Date.now(),updatedAt:Date.now(),reminderCount:0}}:c));
-  setNotice("Pengajuan pembayaran berhasil dikirim ke PertaLife.");
+ function openClaimSubmission(id:string){
+  const c=cases.find(x=>x.id===id);if(!c||!c.dischargeRequest)return;
+  const m=members.find(x=>x.cardNo===c.memberId);
+  if(c.claimSubmission){setClaimDraft(c.claimSubmission)}else{
+   setClaimDraft({
+    receiptDate:new Date().toISOString().slice(0,10),
+    product:m?.product||"Prokes",
+    claimType:c.visitType||"Rumah Sakit",
+    reimbursementType:"",
+    bankName:"",
+    applicantName:c.provider,
+    participantName:c.name,
+    participantNo:c.memberId,
+    phone:"",
+    email:"",
+    description:"Klaim "+c.visitType+" "+c.provider+" - "+c.id,
+    paymentMethod:"Transfer",
+    accountNo:"",
+    accountName:"",
+    applicationStatus:"Diajukan",
+    submittedBy:c.provider,
+    receivedBy:"",
+    claimProkes:true,
+    submittedAt:0,
+    documents:claimDocumentLabels.map(label=>({label,submitted:false,cs:false,cl:false,fa:false,remark:""}))
+   });
+  }
+  setSelectedCaseId(id);setView("claim");setShowCaseDetail(false);
+ }
+ function submitClaim(){
+  if(!selectedCase||!claimDraft||!selectedCase.dischargeRequest)return;
+  if(!claimDraft.bankName.trim()||!claimDraft.accountNo.trim()||!claimDraft.accountName.trim()){
+   setNotice("Nama Bank, No. Rekening, dan Atas Nama wajib diisi sebelum submit klaim.");return;
+  }
+  const submittedAt=Date.now();
+  setCases(v=>v.map(c=>c.id===selectedCase.id?{...c,claimSubmission:{...claimDraft,applicationStatus:"Diterima",submittedAt},billing:{status:"Submitted",submittedAt,updatedAt:submittedAt,reminderCount:0}}:c));
+  setNotice("Pengajuan klaim pembayaran berhasil dikirim ke PertaLife.");
+  setClaimDraft(null);setSelectedCaseId(null);setView("history");
+ }
+ function updateClaimDocument(caseId:string,index:number,patch:Partial<ClaimDocument>){
+  setCases(v=>v.map(c=>c.id===caseId&&c.claimSubmission?{...c,claimSubmission:{...c.claimSubmission,documents:c.claimSubmission.documents.map((d,i)=>i===index?{...d,...patch}:d)}}:c));
+ }
+ function updateClaimMeta(caseId:string,patch:Partial<ClaimSubmission>){
+  setCases(v=>v.map(c=>c.id===caseId&&c.claimSubmission?{...c,claimSubmission:{...c.claimSubmission,...patch}}:c));
  }
  function sendPaymentReminder(id:string){
   setCases(v=>v.map(c=>c.id===id&&c.billing&&c.billing.status!=="Paid"?{...c,billing:{...c.billing,reminderCount:(c.billing.reminderCount||0)+1,lastReminderAt:Date.now(),updatedAt:Date.now()}}:c));
@@ -206,11 +270,13 @@ export default function Page(){
     <button className={view==="treatment"?"active":""} onClick={()=>setView("treatment")}><Stethoscope size={18}/>Treatment Request</button>
     <button className={view==="discharge"?"active":""} onClick={()=>setView("discharge")}><FileCheck2 size={18}/>Discharge</button>
     <button className={view==="history"?"active":""} onClick={()=>setView("history")}><Clock3 size={18}/>Riwayat Discharge</button>
+    <button className={view==="claim"?"active":""} onClick={()=>setView("history")}><FileSpreadsheet size={18}/>Pengajuan Klaim</button>
    </>:<>
     <button className={view==="master"?"active":""} onClick={()=>setView("master")}><Database size={18}/>Master Peserta</button>
     <button className={view==="queue"?"active":""} onClick={()=>setView("queue")}><Clock3 size={18}/>Verification Queue</button>
     <button className={view==="eligibility"?"active":""} onClick={()=>setView("eligibility")}><ShieldCheck size={18}/>Eligibility Review</button>
     <button className={view==="history"?"active":""} onClick={()=>setView("history")}><Clock3 size={18}/>Riwayat Discharge</button>
+    <button className={view==="claim"?"active":""} onClick={()=>setView("history")}><FileSpreadsheet size={18}/>Klaim Provider</button>
     <button className={view==="audit"?"active":""} onClick={()=>setView("audit")}><FileCheck2 size={18}/>Audit Trail</button>
    </>}
   </nav>
@@ -288,6 +354,49 @@ export default function Page(){
    <div className="workflowActions"><span>Peserta belum dianggap selesai sampai Call Center melakukan verifikasi discharge.</span><button className="primary" disabled={!finalDiagnosis.trim()||!finalBill.trim()} onClick={submitDischarge}>Submit Discharge <ArrowRight size={17}/></button></div>
   </section>}
 
+  {view==="claim"&&selectedCase&&role==="provider"&&claimDraft&&<section className="card claimForm">
+   <div className="sectionHead"><div><h2>Pengajuan Klaim Pembayaran</h2><p>{selectedCase.id} · {selectedCase.name} · Final Bill {formatRupiah(selectedCase.dischargeRequest?.finalBill||0)}</p></div><button className="reviewClear" onClick={()=>{setClaimDraft(null);setSelectedCaseId(null);setView("history")}}><X size={15}/> Batal</button></div>
+   <div className="claimGrid">
+    <label>Tanggal Penerimaan<input type="date" value={claimDraft.receiptDate} onChange={e=>setClaimDraft({...claimDraft,receiptDate:e.target.value})}/></label>
+    <label>Produk<input value={claimDraft.product} onChange={e=>setClaimDraft({...claimDraft,product:e.target.value})}/></label>
+    <label>Jenis Klaim<select value={claimDraft.claimType} onChange={e=>setClaimDraft({...claimDraft,claimType:e.target.value})}><option>Rumah Sakit</option><option>Klinik</option><option>Rawat Jalan</option><option>Rawat Inap</option><option>UGD / IGD</option><option>Emergency Gigi</option></select></label>
+    <label>Jenis Reimbursement<input value={claimDraft.reimbursementType} onChange={e=>setClaimDraft({...claimDraft,reimbursementType:e.target.value})} placeholder="Opsional"/></label>
+    <label>Nama Bank *<input value={claimDraft.bankName} onChange={e=>setClaimDraft({...claimDraft,bankName:e.target.value})} placeholder="Contoh Bank Mandiri"/></label>
+    <label>Metode Pembayaran<select value={claimDraft.paymentMethod} onChange={e=>setClaimDraft({...claimDraft,paymentMethod:e.target.value})}><option>Transfer</option><option>Giro</option></select></label>
+    <label>No. Rekening *<input value={claimDraft.accountNo} onChange={e=>setClaimDraft({...claimDraft,accountNo:e.target.value.replace(/\D/g,"")})} inputMode="numeric"/></label>
+    <label>Atas Nama *<input value={claimDraft.accountName} onChange={e=>setClaimDraft({...claimDraft,accountName:e.target.value})}/></label>
+    <label>Nama Pemohon<input value={claimDraft.applicantName} onChange={e=>setClaimDraft({...claimDraft,applicantName:e.target.value})}/></label>
+    <label>Nama Peserta<input value={claimDraft.participantName} readOnly/></label>
+    <label>No. Peserta<input value={claimDraft.participantNo} readOnly/></label>
+    <label>Telepon<input value={claimDraft.phone} onChange={e=>setClaimDraft({...claimDraft,phone:e.target.value})}/></label>
+    <label>Email<input type="email" value={claimDraft.email} onChange={e=>setClaimDraft({...claimDraft,email:e.target.value})}/></label>
+    <label>Status Pengajuan<input value={claimDraft.applicationStatus} readOnly/></label>
+    <label>Pengaju<input value={claimDraft.submittedBy} readOnly/></label>
+    <label>Diterima Oleh<input value={claimDraft.receivedBy} readOnly placeholder="Diisi PertaLife"/></label>
+    <label className="claimCheck"><input type="checkbox" checked={claimDraft.claimProkes} onChange={e=>setClaimDraft({...claimDraft,claimProkes:e.target.checked})}/>Checklist Klaim Prokes</label>
+    <label className="full">Keterangan<textarea value={claimDraft.description} onChange={e=>setClaimDraft({...claimDraft,description:e.target.value})}/></label>
+   </div>
+   <div className="claimDocs"><div className="claimDocsHead"><h3>Dokumen Persyaratan Klaim</h3><span>Tandai dokumen yang tersedia. Nama file dicatat untuk prototype; file belum disimpan ke server.</span></div>
+    <table><thead><tr><th>No</th><th>Dokumen</th><th>Tersedia</th><th>File</th></tr></thead><tbody>{claimDraft.documents.map((d,i)=><tr key={d.label}><td>{i+1}</td><td><b>{d.label}</b></td><td><input type="checkbox" checked={d.submitted} onChange={e=>{const docs=claimDraft.documents.map((x,j)=>j===i?{...x,submitted:e.target.checked}:x);setClaimDraft({...claimDraft,documents:docs})}}/></td><td><input type="file" onChange={e=>{const fileName=e.target.files?.[0]?.name||"";const docs=claimDraft.documents.map((x,j)=>j===i?{...x,fileName,submitted:!!fileName||x.submitted}:x);setClaimDraft({...claimDraft,documents:docs})}}/>{d.fileName&&<small>{d.fileName}</small>}</td></tr>)}</tbody></table>
+   </div>
+   <div className="workflowActions"><span>Final Bill yang diajukan: <b>{formatRupiah(selectedCase.dischargeRequest?.finalBill||0)}</b></span><button className="primary" onClick={submitClaim}>Submit Klaim ke PertaLife <ArrowRight size={17}/></button></div>
+  </section>}
+
+  {view==="claim"&&selectedCase&&role==="callcenter"&&selectedCase.claimSubmission&&<section className="card claimForm">
+   <div className="sectionHead"><div><h2>Review Klaim Provider</h2><p>{selectedCase.id} · {selectedCase.provider} · {selectedCase.name}</p></div><button className="reviewClear" onClick={()=>{setSelectedCaseId(null);setView("history")}}><X size={15}/> Tutup</button></div>
+   <div className="claimSummary">
+    <div><span>Tanggal Penerimaan</span><b>{niceDate(selectedCase.claimSubmission.receiptDate)}</b></div><div><span>Produk</span><b>{selectedCase.claimSubmission.product||"-"}</b></div><div><span>Jenis Klaim</span><b>{selectedCase.claimSubmission.claimType||"-"}</b></div><div><span>Jenis Reimbursement</span><b>{selectedCase.claimSubmission.reimbursementType||"-"}</b></div>
+    <div><span>Nama Bank</span><b>{selectedCase.claimSubmission.bankName||"-"}</b></div><div><span>Metode Pembayaran</span><b>{selectedCase.claimSubmission.paymentMethod||"-"}</b></div><div><span>No. Rekening</span><b>{selectedCase.claimSubmission.accountNo||"-"}</b></div><div><span>Atas Nama</span><b>{selectedCase.claimSubmission.accountName||"-"}</b></div>
+    <div><span>Nama Pemohon</span><b>{selectedCase.claimSubmission.applicantName||"-"}</b></div><div><span>Nama Peserta</span><b>{selectedCase.claimSubmission.participantName}</b></div><div><span>No. Peserta</span><b>{selectedCase.claimSubmission.participantNo}</b></div><div><span>Final Bill</span><b>{formatRupiah(selectedCase.dischargeRequest?.finalBill||0)}</b></div>
+    <div><span>Telepon</span><b>{selectedCase.claimSubmission.phone||"-"}</b></div><div><span>Email</span><b>{selectedCase.claimSubmission.email||"-"}</b></div><div><span>Status Pengajuan</span><b>{selectedCase.claimSubmission.applicationStatus}</b></div><div><span>Checklist Prokes</span><b>{selectedCase.claimSubmission.claimProkes?"Ya":"Tidak"}</b></div>
+    <div className="full"><span>Keterangan</span><b>{selectedCase.claimSubmission.description||"-"}</b></div>
+   </div>
+   <div className="claimReceive"><label>Diterima Oleh<input value={selectedCase.claimSubmission.receivedBy} onChange={e=>updateClaimMeta(selectedCase.id,{receivedBy:e.target.value})} placeholder="Nama PIC PertaLife"/></label></div>
+   <div className="claimDocs"><div className="claimDocsHead"><h3>Dokumen Persyaratan Klaim</h3><span>Checklist internal PertaLife: CS / CL / FA dan keterangan.</span></div>
+    <table><thead><tr><th>No</th><th>Dokumen</th><th>Provider</th><th>CS</th><th>CL</th><th>FA</th><th>Keterangan</th></tr></thead><tbody>{selectedCase.claimSubmission.documents.map((d,i)=><tr key={d.label}><td>{i+1}</td><td><b>{d.label}</b><small>{d.fileName||"Tidak ada file"}</small></td><td><span className={d.submitted?"remarkOk":"remarkWarning"}>{d.submitted?"Ada":"Tidak Ada"}</span></td><td><input type="checkbox" checked={d.cs} onChange={e=>updateClaimDocument(selectedCase.id,i,{cs:e.target.checked})}/></td><td><input type="checkbox" checked={d.cl} onChange={e=>updateClaimDocument(selectedCase.id,i,{cl:e.target.checked})}/></td><td><input type="checkbox" checked={d.fa} onChange={e=>updateClaimDocument(selectedCase.id,i,{fa:e.target.checked})}/></td><td><input value={d.remark} onChange={e=>updateClaimDocument(selectedCase.id,i,{remark:e.target.value})} placeholder="Keterangan"/></td></tr>)}</tbody></table>
+   </div>
+  </section>}
+
   {showCaseDetail&&selectedCase&&<section className="card caseDetail">
    <div className="sectionHead"><div><h2>Detail Case {selectedCase.id}</h2><p>{selectedCase.name} · {selectedCase.memberId}</p></div><button className="reviewClear" onClick={()=>setShowCaseDetail(false)}><X size={15}/> Tutup</button></div>
    <div className="detailGrid detailGridWide caseDetailGrid">
@@ -303,7 +412,7 @@ export default function Page(){
   {view==="history"&&<section className="card dischargeHistory">
    <div className="sectionHead"><div><h2>Riwayat Discharge & Pembayaran</h2><p>{role==="provider"?"Ajukan pembayaran final bill dan kirim reminder ke PertaLife.":"Pantau discharge provider, final bill, reminder, dan status proses pembayaran."}</p></div><span className="countPill">{dischargeHistory.length} discharge</span></div>
    <div className="tableWrap"><table className="historyTable"><thead><tr><th>Case</th><th>Peserta</th><th>Provider</th><th>Final Diagnosis</th><th>Final Bill</th><th>Discharge</th><th>Pembayaran</th><th>Reminder</th><th>Aksi</th></tr></thead><tbody>
-    {dischargeHistory.length===0?<tr><td colSpan={9} className="emptyState"><b>Belum ada riwayat discharge</b><small>Riwayat akan muncul setelah Provider mengajukan discharge.</small></td></tr>:dischargeHistory.map(c=><tr key={c.id}><td><b>{c.id}</b><small>{c.dischargeRequest?new Date(c.dischargeRequest.submittedAt).toLocaleString("id-ID"):"-"}</small></td><td><b>{c.name}</b><small>{c.memberId} · {c.company}</small></td><td><b>{c.provider}</b><small>{c.providerCode||"-"}</small></td><td><b>{c.dischargeRequest?.finalDiagnosis||"-"}</b><small>{c.dischargeRequest?.notes||"-"}</small></td><td><b>{formatRupiah(c.dischargeRequest?.finalBill||0)}</b></td><td><span className={"badge "+(c.status==="Closed"?"":"urgent")}>{c.status==="Closed"?"Discharge Approved":c.status}</span></td><td><span className={"billingBadge "+(c.billing?.status==="Paid"?"paid":"")}>{c.billing?.status||"Belum Diajukan"}</span></td><td><b>{c.billing?.reminderCount||0}x</b><small>{c.billing?.lastReminderAt?"Terakhir "+new Date(c.billing.lastReminderAt).toLocaleString("id-ID"):"-"}</small></td><td>{role==="provider"?<div className="actions historyActions">{c.status==="Closed"&&!c.billing&&<button className="approve" onClick={()=>requestPayment(c.id)}>Ajukan Pembayaran</button>}{c.billing&&c.billing.status!=="Paid"&&<button onClick={()=>sendPaymentReminder(c.id)}>Kirim Reminder</button>}{c.billing?.status==="Paid"&&<span className="paidText">Sudah Dibayar</span>}<button onClick={()=>openCaseDetail(c.id)}><Eye size={14}/>Detail</button></div>:<div className="actions historyActions">{!c.billing?<span className="muted">Belum diajukan</span>:c.billing.status==="Submitted"?<button className="approve" onClick={()=>advanceBilling(c.id,"Under Verification")}>Mulai Verifikasi</button>:c.billing.status==="Under Verification"?<button className="approve" onClick={()=>advanceBilling(c.id,"Approved")}>Approve Payment</button>:c.billing.status==="Approved"?<button className="approve" onClick={()=>advanceBilling(c.id,"Scheduled for Payment")}>Schedule Payment</button>:c.billing.status==="Scheduled for Payment"?<button className="approve" onClick={()=>advanceBilling(c.id,"Paid")}>Mark Paid</button>:<span className="paidText">Paid</span>}<button onClick={()=>openCaseDetail(c.id)}><Eye size={14}/>Detail</button></div>}</td></tr>)}
+    {dischargeHistory.length===0?<tr><td colSpan={9} className="emptyState"><b>Belum ada riwayat discharge</b><small>Riwayat akan muncul setelah Provider mengajukan discharge.</small></td></tr>:dischargeHistory.map(c=><tr key={c.id}><td><b>{c.id}</b><small>{c.dischargeRequest?new Date(c.dischargeRequest.submittedAt).toLocaleString("id-ID"):"-"}</small></td><td><b>{c.name}</b><small>{c.memberId} · {c.company}</small></td><td><b>{c.provider}</b><small>{c.providerCode||"-"}</small></td><td><b>{c.dischargeRequest?.finalDiagnosis||"-"}</b><small>{c.dischargeRequest?.notes||"-"}</small></td><td><b>{formatRupiah(c.dischargeRequest?.finalBill||0)}</b></td><td><span className={"badge "+(c.status==="Closed"?"":"urgent")}>{c.status==="Closed"?"Discharge Approved":c.status}</span></td><td><span className={"billingBadge "+(c.billing?.status==="Paid"?"paid":"")}>{c.billing?.status||"Belum Diajukan"}</span>{c.claimSubmission&&<small>{c.claimSubmission.applicationStatus}</small>}</td><td><b>{c.billing?.reminderCount||0}x</b><small>{c.billing?.lastReminderAt?"Terakhir "+new Date(c.billing.lastReminderAt).toLocaleString("id-ID"):"-"}</small></td><td>{role==="provider"?<div className="actions historyActions">{c.status==="Closed"&&!c.billing&&<button className="approve" onClick={()=>openClaimSubmission(c.id)}>Ajukan Klaim Pembayaran</button>}{c.billing&&c.billing.status!=="Paid"&&<button onClick={()=>sendPaymentReminder(c.id)}>Kirim Reminder</button>}{c.billing?.status==="Paid"&&<span className="paidText">Sudah Dibayar</span>}<button onClick={()=>openCaseDetail(c.id)}><Eye size={14}/>Detail</button></div>:<div className="actions historyActions">{c.claimSubmission&&<button onClick={()=>{setSelectedCaseId(c.id);setView("claim")}}><FileSpreadsheet size={14}/>Review Klaim</button>}{!c.billing?<span className="muted">Belum diajukan</span>:c.billing.status==="Submitted"?<button className="approve" onClick={()=>advanceBilling(c.id,"Under Verification")}>Mulai Verifikasi</button>:c.billing.status==="Under Verification"?<button className="approve" onClick={()=>advanceBilling(c.id,"Approved")}>Approve Payment</button>:c.billing.status==="Approved"?<button className="approve" onClick={()=>advanceBilling(c.id,"Scheduled for Payment")}>Schedule Payment</button>:c.billing.status==="Scheduled for Payment"?<button className="approve" onClick={()=>advanceBilling(c.id,"Paid")}>Mark Paid</button>:<span className="paidText">Paid</span>}<button onClick={()=>openCaseDetail(c.id)}><Eye size={14}/>Detail</button></div>}</td></tr>)}
    </tbody></table></div>
   </section>}
 
