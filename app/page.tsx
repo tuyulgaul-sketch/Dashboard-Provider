@@ -41,6 +41,102 @@ const defaultProviderProfiles:Record<string,ProviderProfile>={
  "PRV-HERMINA-KMY-001":{providerCode:"PRV-HERMINA-KMY-001",providerName:"RS Hermina Kemayoran",providerType:"Rumah Sakit",address:"",city:"",contactPerson:"",phone:"",email:"",paymentMethod:"Transfer",bankName:"",accountNo:"",accountName:""},
  "PRV-KF-CBT-001":{providerCode:"PRV-KF-CBT-001",providerName:"Klinik Kimia Farma Cibitung",providerType:"Klinik",address:"",city:"",contactPerson:"",phone:"",email:"",paymentMethod:"Transfer",bankName:"",accountNo:"",accountName:""}
 };
+const bankOptions=[
+ {code:"008",name:"Bank Mandiri (Persero) Tbk",alias:"mandiri"},
+ {code:"002",name:"Bank Rakyat Indonesia (Persero) Tbk",alias:"bri"},
+ {code:"009",name:"Bank Negara Indonesia (Persero) Tbk",alias:"bni"},
+ {code:"200",name:"Bank Tabungan Negara (Persero) Tbk",alias:"btn"},
+ {code:"014",name:"Bank Central Asia Tbk",alias:"bca"},
+ {code:"022",name:"Bank CIMB Niaga Tbk",alias:"cimb niaga"},
+ {code:"011",name:"Bank Danamon Indonesia Tbk",alias:"danamon"},
+ {code:"013",name:"Bank Permata Tbk",alias:"permata"},
+ {code:"019",name:"Panin Bank Tbk",alias:"panin"},
+ {code:"028",name:"Bank OCBC NISP Tbk",alias:"ocbc nisp"},
+ {code:"016",name:"Bank Maybank Indonesia Tbk",alias:"maybank"},
+ {code:"023",name:"Bank UOB Indonesia",alias:"uob"},
+ {code:"426",name:"Bank Mega Tbk",alias:"mega"},
+ {code:"153",name:"Bank Sinarmas Tbk",alias:"sinarmas"},
+ {code:"441",name:"Bank KB Bukopin Tbk",alias:"kb bukopin"},
+ {code:"536",name:"Bank BCA Syariah",alias:"bca syariah"},
+ {code:"451",name:"Bank Syariah Indonesia Tbk",alias:"bsi syariah indonesia"},
+ {code:"147",name:"Bank Muamalat Indonesia Tbk",alias:"muamalat"},
+ {code:"506",name:"Bank Mega Syariah",alias:"mega syariah"},
+ {code:"405",name:"Bank Victoria Syariah",alias:"victoria syariah"},
+ {code:"517",name:"Bank Panin Dubai Syariah Tbk",alias:"panin dubai syariah"},
+ {code:"947",name:"Bank Aladin Syariah Tbk",alias:"aladin"},
+ {code:"547",name:"Bank BTPN Syariah Tbk",alias:"btpn syariah"},
+ {code:"213",name:"Bank SMBC Indonesia Tbk",alias:"smbc btpn"},
+ {code:"542",name:"Bank Jago Tbk",alias:"jago"},
+ {code:"535",name:"SeaBank Indonesia",alias:"seabank"},
+ {code:"567",name:"Allo Bank Indonesia Tbk",alias:"allo"},
+ {code:"490",name:"Bank Neo Commerce Tbk",alias:"neo commerce bnc"},
+ {code:"562",name:"Superbank Indonesia",alias:"superbank"},
+ {code:"501",name:"Bank Digital BCA",alias:"blu bca digital"},
+ {code:"494",name:"Bank Raya Indonesia Tbk",alias:"raya"},
+ {code:"553",name:"Bank Hibank Indonesia",alias:"hibank"},
+ {code:"523",name:"Bank Sahabat Sampoerna",alias:"sampoerna"},
+ {code:"531",name:"Amar Bank Indonesia Tbk",alias:"amar"},
+ {code:"161",name:"Bank Ganesha Tbk",alias:"ganesha"},
+ {code:"054",name:"Bank Capital Indonesia Tbk",alias:"capital"},
+ {code:"036",name:"Bank China Construction Bank Indonesia Tbk",alias:"ccb"},
+ {code:"164",name:"Bank ICBC Indonesia",alias:"icbc"},
+ {code:"212",name:"Bank Woori Saudara Indonesia 1906 Tbk",alias:"woori saudara"},
+ {code:"167",name:"Bank QNB Indonesia Tbk",alias:"qnb"},
+ {code:"087",name:"Bank HSBC Indonesia",alias:"hsbc"},
+ {code:"046",name:"Bank DBS Indonesia",alias:"dbs"},
+ {code:"484",name:"Bank KEB Hana Indonesia",alias:"hana keb"},
+ {code:"048",name:"Bank Mizuho Indonesia",alias:"mizuho"},
+ {code:"042",name:"MUFG Bank Ltd. Jakarta Branch",alias:"mufg tokyo mitsubishi"},
+ {code:"050",name:"Standard Chartered Bank Indonesia",alias:"standard chartered scb"},
+ {code:"095",name:"Bank JTrust Indonesia Tbk",alias:"jtrust"},
+ {code:"047",name:"Bank Resona Perdania",alias:"resona"},
+ {code:"057",name:"Bank BNP Paribas Indonesia",alias:"bnp paribas"},
+ {code:"061",name:"ANZ Indonesia",alias:"anz"},
+ {code:"152",name:"Bank Shinhan Indonesia",alias:"shinhan"},
+ {code:"498",name:"Bank SBI Indonesia",alias:"sbi"},
+ {code:"945",name:"Bank IBK Indonesia Tbk",alias:"ibk"},
+ {code:"146",name:"Bank of India Indonesia Tbk",alias:"bank of india"},
+ {code:"157",name:"Bank Maspion Indonesia Tbk",alias:"maspion"},
+ {code:"503",name:"Bank Nationalnobu Tbk",alias:"nobu nationalnobu"},
+ {code:"566",name:"Bank Oke Indonesia Tbk",alias:"oke"},
+ {code:"485",name:"Bank MNC Internasional Tbk",alias:"mnc"},
+ {code:"076",name:"Bank Bumi Arta Tbk",alias:"bumi arta"},
+ {code:"688",name:"Bank Krom Indonesia Tbk",alias:"krom"},
+ {code:"097",name:"Bank Mayapada Internasional Tbk",alias:"mayapada"},
+ {code:"037",name:"Bank Artha Graha Internasional Tbk",alias:"artha graha"},
+ {code:"555",name:"Bank Index Selindo",alias:"index"},
+ {code:"151",name:"Bank Mestika Dharma Tbk",alias:"mestika"},
+ {code:"564",name:"Bank Mandiri Taspen",alias:"mantap mandiri taspen"},
+ {code:"110",name:"Bank Jabar Banten (BJB)",alias:"bjb jawa barat banten"},
+ {code:"111",name:"Bank DKI",alias:"dki jakarta"},
+ {code:"112",name:"Bank BPD DIY",alias:"bpd diy yogyakarta"},
+ {code:"113",name:"Bank Jateng",alias:"jateng jawa tengah"},
+ {code:"114",name:"Bank Jatim",alias:"jatim jawa timur"},
+ {code:"115",name:"Bank Jambi",alias:"jambi"},
+ {code:"116",name:"Bank Aceh Syariah",alias:"aceh"},
+ {code:"117",name:"Bank Sumut",alias:"sumut sumatera utara"},
+ {code:"118",name:"Bank Nagari",alias:"nagari sumatera barat"},
+ {code:"119",name:"Bank Riau Kepri Syariah",alias:"riau kepri"},
+ {code:"120",name:"Bank Sumsel Babel",alias:"sumsel babel sumatera selatan"},
+ {code:"121",name:"Bank Lampung",alias:"lampung"},
+ {code:"122",name:"Bank Kalsel",alias:"kalsel kalimantan selatan"},
+ {code:"123",name:"Bank Kalbar",alias:"kalbar kalimantan barat"},
+ {code:"124",name:"Bank Kaltimtara",alias:"kaltimtara kalimantan timur utara"},
+ {code:"125",name:"Bank Kalteng",alias:"kalteng kalimantan tengah"},
+ {code:"126",name:"Bank Sulselbar",alias:"sulselbar sulawesi selatan barat"},
+ {code:"127",name:"Bank SulutGo",alias:"sulutgo sulawesi utara gorontalo"},
+ {code:"128",name:"Bank NTB Syariah",alias:"ntb nusa tenggara barat"},
+ {code:"129",name:"Bank Bali",alias:"bali"},
+ {code:"130",name:"Bank NTT",alias:"ntt nusa tenggara timur"},
+ {code:"131",name:"Bank Maluku Malut",alias:"maluku malut"},
+ {code:"132",name:"Bank Papua",alias:"papua"},
+ {code:"133",name:"Bank Bengkulu",alias:"bengkulu"},
+ {code:"134",name:"Bank Sulteng",alias:"sulteng sulawesi tengah"},
+ {code:"135",name:"Bank Sultra",alias:"sultra sulawesi tenggara"},
+ {code:"137",name:"Bank Banten",alias:"banten"},
+ {code:"069",name:"Bank of China (Hong Kong) Jakarta Branch",alias:"bank of china"},
+ {code:"031",name:"Citibank N.A. Indonesia",alias:"citi citibank"}
+] as const;
 const urgencyOptions=["Kecelakaan","Kondisi akut / kegawatdaruratan","Di luar area Faskes 1","Faskes 1 tidak beroperasi","Emergency gigi - dokter gigi umum","Kondisi on-site di lokasi kerja","Lainnya"];
 const requiredHeaders=["POLICYNO","COMPANY","DEPARTMENT","START DATE","END DATE","MEMBERSHIP NO","MEMBER NAME","EMPLOYEE NAME","EMPLOYEE MEMBERSHIP NO","DOB","INCEPTION","EXPIRY","GENDER","MARITAL STATUS","RELATIONSHIP","CARD NO","PRODUCT","PLAN NAME","FASKES 1 CODE","FASKES 1 NAME"];
 const optionalReviewHeaders=["PLAN CODE"];
@@ -84,7 +180,7 @@ export default function Page(){
  const [treatmentDiagnosis,setTreatmentDiagnosis]=useState(""),[treatmentProcedure,setTreatmentProcedure]=useState(""),[treatmentMedication,setTreatmentMedication]=useState(""),[treatmentCost,setTreatmentCost]=useState(""),[treatmentReason,setTreatmentReason]=useState(""),[treatmentAttachments,setTreatmentAttachments]=useState<string[]>([]);
  const [finalDiagnosis,setFinalDiagnosis]=useState(""),[finalBill,setFinalBill]=useState(""),[dischargeNotes,setDischargeNotes]=useState("");
  const [claimDraft,setClaimDraft]=useState<ClaimSubmission|null>(null),[selectedClaimCases,setSelectedClaimCases]=useState<string[]>([]);
- const [providerProfiles,setProviderProfiles]=useState<Record<string,ProviderProfile>>(defaultProviderProfiles),[profileDraft,setProfileDraft]=useState<ProviderProfile|null>(null);
+ const [providerProfiles,setProviderProfiles]=useState<Record<string,ProviderProfile>>(defaultProviderProfiles),[profileDraft,setProfileDraft]=useState<ProviderProfile|null>(null),[bankSearch,setBankSearch]=useState(""),[bankOpen,setBankOpen]=useState(false);
  const [uploadReview,setUploadReview]=useState<UploadReview|null>(null); const [reviewFilter,setReviewFilter]=useState("all"); const [memberPage,setMemberPage]=useState(1); const [memberPageSize,setMemberPageSize]=useState(50);
 
  useEffect(()=>{try{const m=localStorage.getItem("pertalife-managed-care-members-v2"),c=localStorage.getItem("pertalife-managed-care-cases"),p=localStorage.getItem("pertalife-managed-care-provider-profiles");if(m)setMembers(JSON.parse(m));if(c)setCases(JSON.parse(c));if(p)setProviderProfiles({...defaultProviderProfiles,...JSON.parse(p)});}catch{}setHydrated(true);const t=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t)},[]);
@@ -94,6 +190,11 @@ export default function Page(){
 
  const activeProvider=providerAccounts.find(p=>p.code===activeProviderCode)||providerAccounts[0];
  const activeProviderProfile=providerProfiles[activeProvider.code]||defaultProviderProfiles[activeProvider.code];
+ const filteredBanks=useMemo(()=>{
+  const q=bankSearch.trim().toLowerCase();
+  if(!q)return bankOptions;
+  return bankOptions.filter(b=>(b.name+" "+b.code+" "+b.alias).toLowerCase().includes(q));
+ },[bankSearch]);
  const visibleCases=useMemo(()=>role==="provider"?cases.filter(c=>c.providerCode===activeProvider.code||(!c.providerCode&&c.provider===activeProvider.name)):cases,[cases,role,activeProvider.code,activeProvider.name]);
  const waiting=useMemo(()=>visibleCases.filter(c=>c.status.startsWith("Waiting")),[visibleCases]);
  const filtered=visibleCases.filter(c=>(c.name+" "+c.memberId+" "+c.company+" "+c.id).toLowerCase().includes(query.toLowerCase())).filter(c=>statusFilter==="Open"?c.status!=="Closed":statusFilter?c.status===statusFilter:true);
@@ -222,14 +323,16 @@ export default function Page(){
  function openProviderProfile(){
   const profile=providerProfiles[activeProvider.code]||defaultProviderProfiles[activeProvider.code];
   setProfileDraft({...profile,providerCode:activeProvider.code,providerName:activeProvider.name});
-  setView("profile");setNotice("");
+  setBankSearch(profile.bankName||"");setBankOpen(false);setView("profile");setNotice("");
  }
  function saveProviderProfile(){
   if(!profileDraft)return;
   if(!profileDraft.providerName.trim()){setNotice("Nama Provider tidak boleh kosong.");return}
+  if(profileDraft.bankName&&!bankOptions.some(b=>b.name===profileDraft.bankName)){setNotice("Nama bank wajib dipilih dari daftar bank yang tersedia.");return}
+  if(bankSearch.trim()&&!profileDraft.bankName){setNotice("Pilih nama bank dari hasil pencarian, jangan hanya mengetik nama bank.");return}
   const saved={...profileDraft,providerCode:activeProvider.code,providerName:activeProvider.name,updatedAt:Date.now()};
   setProviderProfiles(v=>({...v,[activeProvider.code]:saved}));
-  setProfileDraft(saved);
+  setProfileDraft(saved);setBankSearch(saved.bankName||"");setBankOpen(false);
   setNotice("Profile "+activeProvider.name+" berhasil disimpan.");
  }
  function toggleClaimCase(id:string){
@@ -315,7 +418,7 @@ export default function Page(){
   <div className="sideFoot"><span>Prototype Mode</span><small>Browser data · No production DB</small></div>
  </aside>
  <main>
-  <header><div><h1>{role==="provider"?"Provider Dashboard":"Managed Care Command Center"}</h1><p>{role==="provider"?"Kelola pendaftaran, treatment, dan discharge peserta.":"Master peserta mengikuti struktur data Managed Care PertaLife."}</p></div><div className="switchWrap"><span className="switchLabel">Account Switcher</span><div className="account accountSelector"><div className="avatar">{role==="provider"?<Building2 size={18}/>:<ShieldCheck size={18}/>}</div><div className="accountSelectText"><b>{role==="provider"?activeProvider.name:"Call Center PertaLife"}</b><span>{role==="provider"?activeProvider.code:"Verifier 24/7"}</span></div><select aria-label="Account Switcher" value={role==="callcenter"?"callcenter":activeProvider.code} onChange={e=>{const v=e.target.value;if(v==="callcenter"){setRole("callcenter")}else{setRole("provider");setActiveProviderCode(v as typeof activeProviderCode)}setView("dashboard");setNotice("");setFound(null);setLookupDone(false);setProfileDraft(null)}}><option value="callcenter">Call Center PertaLife</option>{providerAccounts.map(p=><option key={p.code} value={p.code}>{p.name} — {p.code}</option>)}</select><ChevronDown size={17}/></div></div></header>
+  <header><div><h1>{role==="provider"?"Provider Dashboard":"Managed Care Command Center"}</h1><p>{role==="provider"?"Kelola pendaftaran, treatment, dan discharge peserta.":"Master peserta mengikuti struktur data Managed Care PertaLife."}</p></div><div className="switchWrap"><span className="switchLabel">Account Switcher</span><div className="account accountSelector"><div className="avatar">{role==="provider"?<Building2 size={18}/>:<ShieldCheck size={18}/>}</div><div className="accountSelectText"><b>{role==="provider"?activeProvider.name:"Call Center PertaLife"}</b><span>{role==="provider"?activeProvider.code:"Verifier 24/7"}</span></div><select aria-label="Account Switcher" value={role==="callcenter"?"callcenter":activeProvider.code} onChange={e=>{const v=e.target.value;if(v==="callcenter"){setRole("callcenter")}else{setRole("provider");setActiveProviderCode(v as typeof activeProviderCode)}setView("dashboard");setNotice("");setFound(null);setLookupDone(false);setProfileDraft(null);setBankSearch("");setBankOpen(false)}}><option value="callcenter">Call Center PertaLife</option>{providerAccounts.map(p=><option key={p.code} value={p.code}>{p.name} — {p.code}</option>)}</select><ChevronDown size={17}/></div></div></header>
   {notice&&<div className="notice">{notice}</div>}
 
   {view==="dashboard"&&<section className="stats">
@@ -367,7 +470,7 @@ export default function Page(){
     <div className="profileSectionTitle"><FileSpreadsheet size={18}/><div><b>Data Rekening Pembayaran</b><span>Akan otomatis terisi saat Provider membuat single claim maupun bundle claim.</span></div></div>
     <div className="profileGrid">
      <label>Metode Pembayaran<select value={profileDraft.paymentMethod} onChange={e=>setProfileDraft({...profileDraft,paymentMethod:e.target.value})}><option>Transfer</option><option>Giro</option></select></label>
-     <label>Nama Bank<input value={profileDraft.bankName} onChange={e=>setProfileDraft({...profileDraft,bankName:e.target.value})} placeholder="Contoh Bank Mandiri"/></label>
+     <label>Nama Bank<div className="bankCombobox"><div className="bankSearchInput"><Search size={15}/><input value={bankSearch} onFocus={()=>setBankOpen(true)} onChange={e=>{setBankSearch(e.target.value);setProfileDraft({...profileDraft,bankName:""});setBankOpen(true)}} placeholder="Cari nama bank / kode bank..."/><ChevronDown size={15}/></div>{bankOpen&&<div className="bankDropdown">{filteredBanks.length===0?<div className="bankEmpty">Bank tidak ditemukan</div>:filteredBanks.map(b=><button type="button" key={b.code+"-"+b.name} onMouseDown={e=>e.preventDefault()} onClick={()=>{setProfileDraft({...profileDraft,bankName:b.name});setBankSearch(b.name);setBankOpen(false)}}><span>{b.name}</span><small>Kode {b.code}</small></button>)}</div>}</div>{profileDraft.bankName&&<small className="bankSelected">Terpilih: {profileDraft.bankName}</small>}</label>
      <label>No. Rekening<input inputMode="numeric" value={profileDraft.accountNo} onChange={e=>setProfileDraft({...profileDraft,accountNo:e.target.value.replace(/\D/g,"")})} placeholder="Nomor rekening"/></label>
      <label>Atas Nama Rekening<input value={profileDraft.accountName} onChange={e=>setProfileDraft({...profileDraft,accountName:e.target.value})} placeholder="Nama pemilik rekening"/></label>
     </div>
