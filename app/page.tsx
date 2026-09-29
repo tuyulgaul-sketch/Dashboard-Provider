@@ -1,16 +1,19 @@
 "use client";
 import {useEffect,useMemo,useState} from "react";
-import {Activity,AlertTriangle,ArrowRight,Building2,CheckCircle2,ChevronDown,ChevronLeft,ChevronRight,Clock3,Database,FileCheck2,FileSpreadsheet,HeartPulse,Plus,Search,ShieldCheck,Stethoscope,Trash2,Upload,UserRound} from "lucide-react";
+import {Activity,AlertTriangle,ArrowRight,Building2,CheckCircle2,ChevronDown,ChevronLeft,ChevronRight,Clock3,Database,Eye,FileCheck2,FileSpreadsheet,HeartPulse,Plus,Search,ShieldCheck,Stethoscope,Trash2,Upload,UserRound,X} from "lucide-react";
 
 type Role="provider"|"callcenter";
-type CaseStatus="Waiting Admission"|"Treatment Active"|"Waiting Treatment Approval"|"Waiting Discharge"|"Closed";
+type CaseStatus="Waiting Admission"|"Treatment Active"|"Waiting Treatment Approval"|"Treatment Approved"|"Waiting Discharge"|"Closed";
 type Member={
  policyNo:string;company:string;department:string;startDate:string;endDate:string;
  membershipNo:string;name:string;employeeName:string;employeeMembershipNo:string;dob:string;
  inception:string;expiry:string;gender:string;maritalStatus:string;relation:string;cardNo:string;
  product:string;planName:string;planCode:string;faskes1Code:string;faskes1Name:string;faskes1?:string;
 };
-type CareCase={id:string;name:string;memberId:string;company:string;provider:string;providerCode?:string;status:CaseStatus;urgent:boolean;submittedAt:number;issue:string;visitType:string;urgencyReason?:string;policyNo?:string;planName?:string};
+type CareCase={id:string;name:string;memberId:string;company:string;provider:string;providerCode?:string;status:CaseStatus;urgent:boolean;submittedAt:number;issue:string;visitType:string;urgencyReason?:string;policyNo?:string;planName?:string;
+ treatmentRequest?:{diagnosis:string;procedure:string;medication:string;estimatedCost:number;submittedAt:number};
+ dischargeRequest?:{finalDiagnosis:string;finalBill:number;notes:string;submittedAt:number};
+};
 type UploadPreviewRow={row:number;cardNo:string;name:string;missingRequired:string[];missingOptional:string[];duplicate:boolean};
 type UploadReview={file:string;total:number;valid:number;duplicate:number;optionalWarnings:number;missingHeaders:string[];missingOptionalHeaders:string[];previewRows:UploadPreviewRow[];staged:Member[]};
 
@@ -40,6 +43,9 @@ export default function Page(){
  const [cardNo,setCardNo]=useState(""),[visitType,setVisitType]=useState("Rawat Jalan"),[found,setFound]=useState<Member|null>(null),[lookupDone,setLookupDone]=useState(false);
  const [urgent,setUrgent]=useState(false),[urgencyReason,setUrgencyReason]=useState(""),[urgencyText,setUrgencyText]=useState(""),[complaint,setComplaint]=useState("");
  const [view,setView]=useState("dashboard"),[notice,setNotice]=useState("");
+ const [selectedCaseId,setSelectedCaseId]=useState<string|null>(null),[showCaseDetail,setShowCaseDetail]=useState(false);
+ const [treatmentDiagnosis,setTreatmentDiagnosis]=useState(""),[treatmentProcedure,setTreatmentProcedure]=useState(""),[treatmentMedication,setTreatmentMedication]=useState(""),[treatmentCost,setTreatmentCost]=useState("");
+ const [finalDiagnosis,setFinalDiagnosis]=useState(""),[finalBill,setFinalBill]=useState(""),[dischargeNotes,setDischargeNotes]=useState("");
  const [uploadReview,setUploadReview]=useState<UploadReview|null>(null); const [reviewFilter,setReviewFilter]=useState("all"); const [memberPage,setMemberPage]=useState(1); const [memberPageSize,setMemberPageSize]=useState(50);
 
  useEffect(()=>{try{const m=localStorage.getItem("pertalife-managed-care-members-v2"),c=localStorage.getItem("pertalife-managed-care-cases");if(m)setMembers(JSON.parse(m));if(c)setCases(JSON.parse(c));}catch{}setHydrated(true);const t=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t)},[]);
@@ -50,6 +56,7 @@ export default function Page(){
  const visibleCases=useMemo(()=>role==="provider"?cases.filter(c=>c.providerCode===activeProvider.code||(!c.providerCode&&c.provider===activeProvider.name)):cases,[cases,role,activeProvider.code,activeProvider.name]);
  const waiting=useMemo(()=>visibleCases.filter(c=>c.status.startsWith("Waiting")),[visibleCases]);
  const filtered=visibleCases.filter(c=>(c.name+" "+c.memberId+" "+c.company+" "+c.id).toLowerCase().includes(query.toLowerCase())).filter(c=>statusFilter==="Open"?c.status!=="Closed":statusFilter?c.status===statusFilter:true);
+ const selectedCase=selectedCaseId?cases.find(c=>c.id===selectedCaseId)||null:null;
  const filteredMembers=useMemo(()=>members.filter(m=>(m.cardNo+" "+m.name+" "+m.membershipNo+" "+m.employeeName+" "+m.employeeMembershipNo+" "+m.company+" "+m.department+" "+m.policyNo).toLowerCase().includes(memberQuery.toLowerCase())),[members,memberQuery]);
  const memberPageCount=Math.max(1,Math.ceil(filteredMembers.length/memberPageSize));
  const safeMemberPage=Math.min(memberPage,memberPageCount);
@@ -143,6 +150,21 @@ export default function Page(){
  }
  function lookup(){const m=members.find(x=>x.cardNo.toLowerCase()===cardNo.trim().toLowerCase())||null;setFound(m);setLookupDone(true);setUrgent(false);setUrgencyReason("");setUrgencyText("");setComplaint("");}
  function submitAdmission(){if(!found||!canSubmit)return;const id="MC-"+new Date().toISOString().slice(2,10).replaceAll("-","")+"-"+String(cases.length+1).padStart(4,"0");setCases(v=>[{id,name:found.name,memberId:found.cardNo,company:found.company,provider:activeProvider.name,providerCode:activeProvider.code,status:"Waiting Admission",urgent,submittedAt:Date.now(),issue:complaint,visitType,urgencyReason:urgent?(urgencyReason==="Lainnya"?urgencyText:urgencyReason):undefined,policyNo:found.policyNo,planName:found.planName},...v]);setNotice("Admission berhasil dikirim ke Call Center PertaLife.");setFound(null);setCardNo("");setLookupDone(false);setComplaint("");setUrgent(false);}
+ function openCaseDetail(id:string){setSelectedCaseId(id);setShowCaseDetail(true)}
+ function openTreatment(id:string){setSelectedCaseId(id);setTreatmentDiagnosis("");setTreatmentProcedure("");setTreatmentMedication("");setTreatmentCost("");setView("treatment");setShowCaseDetail(false)}
+ function submitTreatment(){
+  if(!selectedCase||!treatmentDiagnosis.trim()||!treatmentProcedure.trim()||!treatmentCost.trim())return;
+  setCases(v=>v.map(c=>c.id===selectedCase.id?{...c,status:"Waiting Treatment Approval",submittedAt:Date.now(),treatmentRequest:{diagnosis:treatmentDiagnosis.trim(),procedure:treatmentProcedure.trim(),medication:treatmentMedication.trim(),estimatedCost:Number(treatmentCost)||0,submittedAt:Date.now()}}:c));
+  setNotice("Treatment Request berhasil dikirim ke Call Center PertaLife.");
+  setView("dashboard");setSelectedCaseId(null);
+ }
+ function openDischarge(id:string){setSelectedCaseId(id);setFinalDiagnosis("");setFinalBill("");setDischargeNotes("");setView("discharge");setShowCaseDetail(false)}
+ function submitDischarge(){
+  if(!selectedCase||!finalDiagnosis.trim()||!finalBill.trim())return;
+  setCases(v=>v.map(c=>c.id===selectedCase.id?{...c,status:"Waiting Discharge",submittedAt:Date.now(),dischargeRequest:{finalDiagnosis:finalDiagnosis.trim(),finalBill:Number(finalBill)||0,notes:dischargeNotes.trim(),submittedAt:Date.now()}}:c));
+  setNotice("Discharge Request berhasil dikirim ke Call Center PertaLife.");
+  setView("dashboard");setSelectedCaseId(null);
+ }
  const decide=(id:string,status:CaseStatus)=>setCases(v=>v.map(c=>c.id===id?{...c,status,submittedAt:Date.now()}:c));
 
  return <div className="shell">
@@ -214,10 +236,41 @@ export default function Page(){
    </div>}
   </section>}
 
+  {role==="provider"&&view==="treatment"&&selectedCase&&<section className="card workflowForm">
+   <div className="sectionHead"><div><h2>Treatment Request</h2><p>{selectedCase.id} · {selectedCase.name} · {selectedCase.memberId}</p></div><button className="reviewClear" onClick={()=>{setView("dashboard");setSelectedCaseId(null)}}><X size={15}/> Batal</button></div>
+   <div className="workflowGrid">
+    <label>Diagnosis *<input value={treatmentDiagnosis} onChange={e=>setTreatmentDiagnosis(e.target.value)} placeholder="Diagnosis / dugaan diagnosis"/></label>
+    <label>Estimasi Biaya *<input type="number" min="0" value={treatmentCost} onChange={e=>setTreatmentCost(e.target.value)} placeholder="0"/></label>
+    <label className="full">Tindakan / Lab / Pemeriksaan *<textarea value={treatmentProcedure} onChange={e=>setTreatmentProcedure(e.target.value)} placeholder="Rincian tindakan, pemeriksaan, atau lab yang diminta"/></label>
+    <label className="full">Obat / Resep<textarea value={treatmentMedication} onChange={e=>setTreatmentMedication(e.target.value)} placeholder="Nama obat, dosis, frekuensi, durasi, qty bila ada"/></label>
+   </div>
+   <div className="workflowActions"><span>Request ini akan masuk ke Waiting Treatment Approval.</span><button className="primary" disabled={!treatmentDiagnosis.trim()||!treatmentProcedure.trim()||!treatmentCost.trim()} onClick={submitTreatment}>Submit Treatment Request <ArrowRight size={17}/></button></div>
+  </section>}
+
+  {role==="provider"&&view==="discharge"&&selectedCase&&<section className="card workflowForm">
+   <div className="sectionHead"><div><h2>Discharge Request</h2><p>{selectedCase.id} · {selectedCase.name} · {selectedCase.memberId}</p></div><button className="reviewClear" onClick={()=>{setView("dashboard");setSelectedCaseId(null)}}><X size={15}/> Batal</button></div>
+   <div className="workflowGrid">
+    <label>Final Diagnosis *<input value={finalDiagnosis} onChange={e=>setFinalDiagnosis(e.target.value)} placeholder="Diagnosis akhir"/></label>
+    <label>Final Bill *<input type="number" min="0" value={finalBill} onChange={e=>setFinalBill(e.target.value)} placeholder="0"/></label>
+    <label className="full">Catatan Discharge<textarea value={dischargeNotes} onChange={e=>setDischargeNotes(e.target.value)} placeholder="Ringkasan tindakan, obat, kondisi pulang, atau catatan lain"/></label>
+   </div>
+   <div className="workflowActions"><span>Peserta belum dianggap selesai sampai Call Center melakukan verifikasi discharge.</span><button className="primary" disabled={!finalDiagnosis.trim()||!finalBill.trim()} onClick={submitDischarge}>Submit Discharge <ArrowRight size={17}/></button></div>
+  </section>}
+
+  {showCaseDetail&&selectedCase&&<section className="card caseDetail">
+   <div className="sectionHead"><div><h2>Detail Case {selectedCase.id}</h2><p>{selectedCase.name} · {selectedCase.memberId}</p></div><button className="reviewClear" onClick={()=>setShowCaseDetail(false)}><X size={15}/> Tutup</button></div>
+   <div className="detailGrid detailGridWide caseDetailGrid">
+    <div><span>Status</span><b>{selectedCase.status}</b></div><div><span>Provider</span><b>{selectedCase.provider}</b></div><div><span>Provider Code</span><b>{selectedCase.providerCode||"-"}</b></div><div><span>Jenis Kunjungan</span><b>{selectedCase.visitType}</b></div>
+    <div><span>Urgent</span><b>{selectedCase.urgent?"Ya":"Tidak"}</b></div><div><span>Alasan Urgent</span><b>{selectedCase.urgencyReason||"-"}</b></div><div><span>Keluhan</span><b>{selectedCase.issue}</b></div><div><span>Polis / Plan</span><b>{selectedCase.policyNo||"-"} / {selectedCase.planName||"-"}</b></div>
+    {selectedCase.treatmentRequest&&<><div><span>Diagnosis</span><b>{selectedCase.treatmentRequest.diagnosis}</b></div><div><span>Estimasi Biaya</span><b>{new Intl.NumberFormat("id-ID",{style:"currency",currency:"IDR",maximumFractionDigits:0}).format(selectedCase.treatmentRequest.estimatedCost)}</b></div><div><span>Tindakan</span><b>{selectedCase.treatmentRequest.procedure}</b></div><div><span>Obat / Resep</span><b>{selectedCase.treatmentRequest.medication||"-"}</b></div></>}
+    {selectedCase.dischargeRequest&&<><div><span>Final Diagnosis</span><b>{selectedCase.dischargeRequest.finalDiagnosis}</b></div><div><span>Final Bill</span><b>{new Intl.NumberFormat("id-ID",{style:"currency",currency:"IDR",maximumFractionDigits:0}).format(selectedCase.dischargeRequest.finalBill)}</b></div><div><span>Catatan Discharge</span><b>{selectedCase.dischargeRequest.notes||"-"}</b></div></>}
+   </div>
+  </section>}
+
   {(view==="dashboard"||view==="queue"||view==="treatment"||view==="discharge"||view==="audit")&&<section className="card queue">
    <div className="sectionHead"><div><h2>{role==="provider"?"Case Peserta":"Real-time Verification Queue"}</h2><p>{role==="provider"?"Pantau status verifikasi setiap case yang disubmit.":"Semua admission tetap harus diverifikasi PertaLife."}</p></div><div className="search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Cari case, nama, CARD NO..."/></div></div>
-   <div className="tableWrap"><table><thead><tr><th>Case</th><th>Peserta</th><th>Provider / Perusahaan</th><th>Polis / Plan</th><th>Status</th><th>SLA</th>{role==="callcenter"&&<th>Aksi</th>}</tr></thead><tbody>
-    {filtered.length===0?<tr><td colSpan={role==="callcenter"?7:6} className="emptyState"><b>{visibleCases.length===0?"Belum ada case":"Tidak ada case pada filter ini"}</b><small>{visibleCases.length===0?"Case akan muncul setelah Provider submit admission.":"Klik card aktif lagi untuk menghapus filter."}</small></td></tr>:filtered.map(c=><tr key={c.id}><td><b>{c.id}</b><small>{c.issue}</small></td><td><b>{c.name}</b><small>{c.memberId}</small></td><td><b>{c.provider}</b><small>{c.company}</small></td><td><b>{c.policyNo||"-"}</b><small>{c.planName||"-"}</small></td><td><span className={"badge "+(c.urgent?"urgent":"")}>{c.urgent&&<AlertTriangle size={13}/>} {c.status}</span>{c.urgencyReason&&<small>Urgent: {c.urgencyReason}</small>}</td><td><span className="sla"><Clock3 size={14}/>{fmt(now-c.submittedAt)}</span></td>{role==="callcenter"&&<td>{c.status==="Waiting Admission"?<div className="actions"><button className="approve" onClick={()=>decide(c.id,"Treatment Active")}><CheckCircle2 size={15}/>Approve</button><button>Need Confirmation</button><button>Reject</button></div>:<span className="muted">No action</span>}</td>}</tr>)}
+   <div className="tableWrap"><table><thead><tr><th>Case</th><th>Peserta</th><th>Provider / Perusahaan</th><th>Polis / Plan</th><th>Status</th><th>SLA</th><th>Aksi</th></tr></thead><tbody>
+    {filtered.length===0?<tr><td colSpan={7} className="emptyState"><b>{visibleCases.length===0?"Belum ada case":"Tidak ada case pada filter ini"}</b><small>{visibleCases.length===0?"Case akan muncul setelah Provider submit admission.":"Klik card aktif lagi untuk menghapus filter."}</small></td></tr>:filtered.map(c=><tr key={c.id}><td><b>{c.id}</b><small>{c.issue}</small></td><td><b>{c.name}</b><small>{c.memberId}</small></td><td><b>{c.provider}</b><small>{c.company}</small></td><td><b>{c.policyNo||"-"}</b><small>{c.planName||"-"}</small></td><td><span className={"badge "+(c.urgent?"urgent":"")}>{c.urgent&&<AlertTriangle size={13}/>} {c.status}</span>{c.urgencyReason&&<small>Urgent: {c.urgencyReason}</small>}</td><td><span className="sla"><Clock3 size={14}/>{fmt(now-c.submittedAt)}</span></td><td>{role==="provider"?<div className="actions providerActions"><button onClick={()=>openCaseDetail(c.id)}><Eye size={15}/>Lihat Detail</button>{c.status==="Treatment Active"&&<button className="approve" onClick={()=>openTreatment(c.id)}><Stethoscope size={15}/>Buat Treatment Request</button>}{c.status==="Treatment Approved"&&<button className="approve" onClick={()=>openDischarge(c.id)}><FileCheck2 size={15}/>Ajukan Discharge</button>}{c.status==="Waiting Admission"&&<span className="waitingText">Menunggu Verifikasi PertaLife</span>}{c.status==="Waiting Treatment Approval"&&<span className="waitingText">Menunggu Approval Treatment</span>}{c.status==="Waiting Discharge"&&<span className="waitingText">Menunggu Verifikasi Discharge</span>}</div>:c.status==="Waiting Admission"?<div className="actions"><button className="approve" onClick={()=>decide(c.id,"Treatment Active")}><CheckCircle2 size={15}/>Approve Admission</button><button>Need Confirmation</button><button>Reject</button></div>:c.status==="Waiting Treatment Approval"?<div className="actions"><button className="approve" onClick={()=>decide(c.id,"Treatment Approved")}><CheckCircle2 size={15}/>Approve Treatment</button><button>Need Confirmation</button><button>Reject</button></div>:c.status==="Waiting Discharge"?<div className="actions"><button className="approve" onClick={()=>decide(c.id,"Closed")}><CheckCircle2 size={15}/>Approve Discharge</button><button>Need Confirmation</button><button>Reject</button></div>:<span className="muted">No action</span>}</td></tr>)}
    </tbody></table></div>
   </section>}
   {role==="callcenter"&&(view==="dashboard"||view==="queue")&&<section className="hint"><ShieldCheck/><div><b>Semua case tetap memerlukan verifikasi PertaLife.</b><span>Eligibility hanya membantu review; tidak ada auto-approval.</span></div><b>{waiting.length} waiting</b></section>}
