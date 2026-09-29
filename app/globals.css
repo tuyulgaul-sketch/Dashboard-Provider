@@ -27,3 +27,12 @@ nav button{border:0;background:transparent;width:100%;text-align:left;font-famil
 .reviewWarning{margin:0 16px 12px;padding:12px 14px;background:#fff8ed;border:1px solid #f0dfbd;border-radius:10px;color:#9a5b13;display:flex;gap:9px;align-items:flex-start}.reviewWarning b,.reviewWarning span{display:block}.reviewWarning span{font-size:11px;margin-top:4px;line-height:1.45}
 .remarkBlocker,.remarkWarning{display:inline-block;padding:5px 8px;border-radius:8px;font-size:10px;font-weight:800;line-height:1.45}.remarkBlocker{background:#fff2f1;color:#a02b20}.remarkWarning{background:#fff8ed;color:#9a5b13}
 @media(max-width:1200px){.reviewStats{grid-template-columns:repeat(3,1fr)}}@media(max-width:700px){.reviewStats{grid-template-columns:repeat(2,1fr)}}
+
+.reviewStatsClickable{display:flex;flex-wrap:wrap;gap:10px}
+.reviewStatsClickable>button{min-width:150px;flex:1 1 150px;padding:12px;border-radius:10px;background:#f7f9fc;border:1px solid #edf1f6;text-align:left;font-family:inherit;cursor:pointer;transition:.15s ease}
+.reviewStatsClickable>button:hover{transform:translateY(-1px);border-color:#b8cdea;box-shadow:0 5px 14px rgba(32,62,97,.08)}
+.reviewStatsClickable>button.selectedReview{box-shadow:0 0 0 2px rgba(11,75,148,.14);border-color:#0b4b94}
+.reviewStatsClickable span,.reviewStatsClickable strong{display:block}.reviewStatsClickable span{font-size:10px;color:#7b899b;text-transform:uppercase;font-weight:800;line-height:1.3}.reviewStatsClickable strong{font-size:22px;margin-top:5px}
+.reviewStatsClickable .okReview{background:#effaf4;border-color:#d8eee2}.reviewStatsClickable .okReview strong{color:#167147}.reviewStatsClickable .badReview{background:#fff2f1;border-color:#f3d1cd}.reviewStatsClickable .badReview strong{color:#b42318}.reviewStatsClickable .warnReview{background:#fff8ed;border-color:#f0dfbd}.reviewStatsClickable .warnReview strong{color:#a15b20}
+.remarkOk{display:inline-block;padding:5px 8px;border-radius:8px;font-size:10px;font-weight:800;line-height:1.45;background:#effaf4;color:#167147}
+.uploadControls{min-width:auto}
