@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useMemo,useState} from "react";
-import {Activity,AlertTriangle,ArrowRight,Building2,CheckCircle2,ChevronDown,Clock3,Database,FileCheck2,FileSpreadsheet,HeartPulse,Plus,Search,ShieldCheck,Stethoscope,Trash2,Upload,UserRound} from "lucide-react";
+import {Activity,AlertTriangle,ArrowRight,Building2,CheckCircle2,ChevronDown,ChevronLeft,ChevronRight,Clock3,Database,FileCheck2,FileSpreadsheet,HeartPulse,Plus,Search,ShieldCheck,Stethoscope,Trash2,Upload,UserRound} from "lucide-react";
 
 type Role="provider"|"callcenter";
 type CaseStatus="Waiting Admission"|"Treatment Active"|"Waiting Treatment Approval"|"Waiting Discharge"|"Closed";
@@ -34,14 +34,17 @@ export default function Page(){
  const [cardNo,setCardNo]=useState(""),[visitType,setVisitType]=useState("Rawat Jalan"),[found,setFound]=useState<Member|null>(null),[lookupDone,setLookupDone]=useState(false);
  const [urgent,setUrgent]=useState(false),[urgencyReason,setUrgencyReason]=useState(""),[urgencyText,setUrgencyText]=useState(""),[complaint,setComplaint]=useState("");
  const [view,setView]=useState("dashboard"),[notice,setNotice]=useState(""),[defaultFaskes,setDefaultFaskes]=useState("");
- const [uploadReview,setUploadReview]=useState<UploadReview|null>(null);
+ const [uploadReview,setUploadReview]=useState<UploadReview|null>(null); const [memberPage,setMemberPage]=useState(1); const [memberPageSize,setMemberPageSize]=useState(50);
 
  useEffect(()=>{try{const m=localStorage.getItem("pertalife-managed-care-members-v2"),c=localStorage.getItem("pertalife-managed-care-cases");if(m)setMembers(JSON.parse(m));if(c)setCases(JSON.parse(c));}catch{}setHydrated(true);const t=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t)},[]);
  useEffect(()=>{if(hydrated){localStorage.setItem("pertalife-managed-care-members-v2",JSON.stringify(members));localStorage.setItem("pertalife-managed-care-cases",JSON.stringify(cases));}},[members,cases,hydrated]);
 
  const waiting=useMemo(()=>cases.filter(c=>c.status.startsWith("Waiting")),[cases]);
  const filtered=cases.filter(c=>(c.name+" "+c.memberId+" "+c.company+" "+c.id).toLowerCase().includes(query.toLowerCase())).filter(c=>statusFilter==="Open"?c.status!=="Closed":statusFilter?c.status===statusFilter:true);
- const filteredMembers=members.filter(m=>(m.cardNo+" "+m.name+" "+m.membershipNo+" "+m.employeeName+" "+m.employeeMembershipNo+" "+m.company+" "+m.department+" "+m.policyNo).toLowerCase().includes(memberQuery.toLowerCase()));
+ const filteredMembers=useMemo(()=>members.filter(m=>(m.cardNo+" "+m.name+" "+m.membershipNo+" "+m.employeeName+" "+m.employeeMembershipNo+" "+m.company+" "+m.department+" "+m.policyNo).toLowerCase().includes(memberQuery.toLowerCase())),[members,memberQuery]);
+ const memberPageCount=Math.max(1,Math.ceil(filteredMembers.length/memberPageSize));
+ const safeMemberPage=Math.min(memberPage,memberPageCount);
+ const pageMembers=useMemo(()=>filteredMembers.slice((safeMemberPage-1)*memberPageSize,safeMemberPage*memberPageSize),[filteredMembers,safeMemberPage,memberPageSize]);
  const active=!!found&&isActiveMember(found);
  const faskesMapped=!!found&&!!found.faskes1.trim();
  const faskesMatch=!!found&&found.faskes1.trim().toLowerCase()===PROVIDER.toLowerCase();
@@ -160,10 +163,11 @@ export default function Page(){
      <div className="reviewActions"><span>{uploadReview.missingHeaders.length||uploadReview.incomplete||uploadReview.duplicate?<><AlertTriangle size={16}/> Upload dikunci sampai seluruh error diperbaiki.</>:<><CheckCircle2 size={16}/> Semua data lolos validasi dan siap diupload.</>}</span><button className="primary" disabled={uploadReview.missingHeaders.length>0||uploadReview.incomplete>0||uploadReview.duplicate>0||uploadReview.total===0} onClick={confirmUpload}><CheckCircle2 size={17}/>Confirm Upload {uploadReview.valid} Peserta</button></div>
     </div>}
    </>}
-   <div className="masterToolbar"><div className="search"><Search size={16}/><input value={memberQuery} onChange={e=>setMemberQuery(e.target.value)} placeholder="Cari CARD NO, nama, membership, pekerja, perusahaan..."/></div><small>{filteredMembers.length} dari {members.length} peserta</small></div>
+   <div className="masterToolbar"><div className="search"><Search size={16}/><input value={memberQuery} onChange={e=>{setMemberQuery(e.target.value);setMemberPage(1)}} placeholder="Cari CARD NO, nama, membership, pekerja, perusahaan..."/></div><div className="masterToolbarRight"><small>{filteredMembers.length} dari {members.length} peserta</small><label>Tampilkan <select value={memberPageSize} onChange={e=>{setMemberPageSize(Number(e.target.value));setMemberPage(1)}}><option value={50}>50</option><option value={100}>100</option><option value={250}>250</option></select></label></div></div>
    <div className="miniTable"><table><thead><tr><th>Card / Membership</th><th>Peserta & Relasi</th><th>Pekerja</th><th>Perusahaan</th><th>Polis / Plan</th><th>Periode</th><th>Faskes 1</th><th>Status</th><th>Aksi</th></tr></thead><tbody>
-    {filteredMembers.length===0?<tr><td colSpan={9} className="emptyState"><b>Belum ada data peserta</b><small>Upload file Excel master peserta dari menu ini.</small></td></tr>:filteredMembers.map(m=><tr key={m.cardNo}><td><b>{m.cardNo}</b><small>{m.membershipNo}</small></td><td><b>{m.name}</b><small>{relationLabel(m.relation)} · {m.gender||"-"} · {m.maritalStatus||"-"}</small></td><td><b>{m.employeeName||"-"}</b><small>{m.employeeMembershipNo||"-"}</small></td><td><b>{m.company}</b><small>{m.department||"-"}</small></td><td><b>{m.policyNo||"-"}</b><small>{m.product||"-"} · {m.planName||"-"} {m.planCode?"("+m.planCode+")":""}</small></td><td><b>{niceDate(m.inception||m.startDate)}</b><small>s.d. {niceDate(m.expiry||m.endDate)}</small></td><td><b>{m.faskes1||"Belum dimapping"}</b></td><td><span className={"statusDot "+(isActiveMember(m)?"ok":"no")}>{isActiveMember(m)?"Aktif":"Tidak Aktif"}</span></td><td><button className="rowDelete" onClick={()=>deleteMember(m.cardNo,m.name)}><Trash2 size={15}/>Hapus</button></td></tr>)}
+    {filteredMembers.length===0?<tr><td colSpan={9} className="emptyState"><b>Belum ada data peserta</b><small>Upload file Excel master peserta dari menu ini.</small></td></tr>:pageMembers.map(m=><tr key={m.cardNo}><td><b>{m.cardNo}</b><small>{m.membershipNo}</small></td><td><b>{m.name}</b><small>{relationLabel(m.relation)} · {m.gender||"-"} · {m.maritalStatus||"-"}</small></td><td><b>{m.employeeName||"-"}</b><small>{m.employeeMembershipNo||"-"}</small></td><td><b>{m.company}</b><small>{m.department||"-"}</small></td><td><b>{m.policyNo||"-"}</b><small>{m.product||"-"} · {m.planName||"-"} {m.planCode?"("+m.planCode+")":""}</small></td><td><b>{niceDate(m.inception||m.startDate)}</b><small>s.d. {niceDate(m.expiry||m.endDate)}</small></td><td><b>{m.faskes1||"Belum dimapping"}</b></td><td><span className={"statusDot "+(isActiveMember(m)?"ok":"no")}>{isActiveMember(m)?"Aktif":"Tidak Aktif"}</span></td><td><button className="rowDelete" onClick={()=>deleteMember(m.cardNo,m.name)}><Trash2 size={15}/>Hapus</button></td></tr>)}
    </tbody></table></div>
+   {filteredMembers.length>0&&<div className="pagination"><span>Menampilkan {(safeMemberPage-1)*memberPageSize+1}-{Math.min(safeMemberPage*memberPageSize,filteredMembers.length)} dari {filteredMembers.length}</span><div><button disabled={safeMemberPage<=1} onClick={()=>setMemberPage(Math.max(1,safeMemberPage-1))}><ChevronLeft size={16}/>Sebelumnya</button><b>Halaman {safeMemberPage} / {memberPageCount}</b><button disabled={safeMemberPage>=memberPageCount} onClick={()=>setMemberPage(Math.min(memberPageCount,safeMemberPage+1))}>Berikutnya<ChevronRight size={16}/></button></div></div>}
   </section>}
 
   {role==="provider"&&(view==="dashboard"||view==="registration")&&<section className="card eligibility">
