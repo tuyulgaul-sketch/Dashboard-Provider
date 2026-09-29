@@ -10,11 +10,14 @@ type Member={
  inception:string;expiry:string;gender:string;maritalStatus:string;relation:string;cardNo:string;
  product:string;planName:string;planCode:string;faskes1Code:string;faskes1Name:string;faskes1?:string;
 };
-type CareCase={id:string;name:string;memberId:string;company:string;provider:string;status:CaseStatus;urgent:boolean;submittedAt:number;issue:string;visitType:string;urgencyReason?:string;policyNo?:string;planName?:string};
+type CareCase={id:string;name:string;memberId:string;company:string;provider:string;providerCode?:string;status:CaseStatus;urgent:boolean;submittedAt:number;issue:string;visitType:string;urgencyReason?:string;policyNo?:string;planName?:string};
 type UploadPreviewRow={row:number;cardNo:string;name:string;missingRequired:string[];missingOptional:string[];duplicate:boolean};
 type UploadReview={file:string;total:number;valid:number;duplicate:number;optionalWarnings:number;missingHeaders:string[];missingOptionalHeaders:string[];previewRows:UploadPreviewRow[];staged:Member[]};
 
-const PROVIDER="RS Hermina Kemayoran";
+const providerAccounts=[
+ {code:"PRV-HERMINA-KMY-001",name:"RS Hermina Kemayoran"},
+ {code:"PRV-KF-CBT-001",name:"Klinik Kimia Farma Cibitung"}
+] as const;
 const urgencyOptions=["Kecelakaan","Kondisi akut / kegawatdaruratan","Di luar area Faskes 1","Faskes 1 tidak beroperasi","Emergency gigi - dokter gigi umum","Kondisi on-site di lokasi kerja","Lainnya"];
 const requiredHeaders=["POLICYNO","COMPANY","DEPARTMENT","START DATE","END DATE","MEMBERSHIP NO","MEMBER NAME","EMPLOYEE NAME","EMPLOYEE MEMBERSHIP NO","DOB","INCEPTION","EXPIRY","GENDER","MARITAL STATUS","RELATIONSHIP","CARD NO","PRODUCT","PLAN NAME","FASKES 1 CODE","FASKES 1 NAME"];
 const optionalReviewHeaders=["PLAN CODE"];
@@ -32,7 +35,7 @@ function faskesName(m:Member){return m.faskes1Name||m.faskes1||""}
 function faskesCode(m:Member){return m.faskes1Code||""}
 
 export default function Page(){
- const [role,setRole]=useState<Role>("provider"),[now,setNow]=useState(Date.now()),[cases,setCases]=useState<CareCase[]>([]),[members,setMembers]=useState<Member[]>([]);
+ const [role,setRole]=useState<Role>("provider"),[activeProviderCode,setActiveProviderCode]=useState(providerAccounts[0].code),[now,setNow]=useState(Date.now()),[cases,setCases]=useState<CareCase[]>([]),[members,setMembers]=useState<Member[]>([]);
  const [query,setQuery]=useState(""),[memberQuery,setMemberQuery]=useState(""),[statusFilter,setStatusFilter]=useState<CaseStatus|"Open"|null>(null),[hydrated,setHydrated]=useState(false);
  const [cardNo,setCardNo]=useState(""),[visitType,setVisitType]=useState("Rawat Jalan"),[found,setFound]=useState<Member|null>(null),[lookupDone,setLookupDone]=useState(false);
  const [urgent,setUrgent]=useState(false),[urgencyReason,setUrgencyReason]=useState(""),[urgencyText,setUrgencyText]=useState(""),[complaint,setComplaint]=useState("");
@@ -43,8 +46,10 @@ export default function Page(){
  useEffect(()=>{if(hydrated)localStorage.setItem("pertalife-managed-care-members-v2",JSON.stringify(members));},[members,hydrated]);
  useEffect(()=>{if(hydrated)localStorage.setItem("pertalife-managed-care-cases",JSON.stringify(cases));},[cases,hydrated]);
 
- const waiting=useMemo(()=>cases.filter(c=>c.status.startsWith("Waiting")),[cases]);
- const filtered=cases.filter(c=>(c.name+" "+c.memberId+" "+c.company+" "+c.id).toLowerCase().includes(query.toLowerCase())).filter(c=>statusFilter==="Open"?c.status!=="Closed":statusFilter?c.status===statusFilter:true);
+ const activeProvider=providerAccounts.find(p=>p.code===activeProviderCode)||providerAccounts[0];
+ const visibleCases=useMemo(()=>role==="provider"?cases.filter(c=>c.providerCode===activeProvider.code||(!c.providerCode&&c.provider===activeProvider.name)):cases,[cases,role,activeProvider.code,activeProvider.name]);
+ const waiting=useMemo(()=>visibleCases.filter(c=>c.status.startsWith("Waiting")),[visibleCases]);
+ const filtered=visibleCases.filter(c=>(c.name+" "+c.memberId+" "+c.company+" "+c.id).toLowerCase().includes(query.toLowerCase())).filter(c=>statusFilter==="Open"?c.status!=="Closed":statusFilter?c.status===statusFilter:true);
  const filteredMembers=useMemo(()=>members.filter(m=>(m.cardNo+" "+m.name+" "+m.membershipNo+" "+m.employeeName+" "+m.employeeMembershipNo+" "+m.company+" "+m.department+" "+m.policyNo).toLowerCase().includes(memberQuery.toLowerCase())),[members,memberQuery]);
  const memberPageCount=Math.max(1,Math.ceil(filteredMembers.length/memberPageSize));
  const safeMemberPage=Math.min(memberPage,memberPageCount);
@@ -67,7 +72,7 @@ export default function Page(){
  const foundFaskesName=found?faskesName(found):"";
  const foundFaskesCode=found?faskesCode(found):"";
  const faskesMapped=!!found&&!!foundFaskesName&&!!foundFaskesCode;
- const faskesMatch=!!found&&foundFaskesName.trim().toLowerCase()===PROVIDER.toLowerCase();
+ const faskesMatch=!!found&&foundFaskesCode.trim().toLowerCase()===activeProvider.code.toLowerCase();
  const canSubmit=!!found&&active&&!!complaint.trim()&&(faskesMatch||(urgent&&!!urgencyReason&&(urgencyReason!=="Lainnya"||!!urgencyText.trim())));
 
  async function bulkUpload(e:React.ChangeEvent<HTMLInputElement>){
@@ -137,7 +142,7 @@ export default function Page(){
   setNotice("Seluruh data Master Peserta berhasil dihapus.");
  }
  function lookup(){const m=members.find(x=>x.cardNo.toLowerCase()===cardNo.trim().toLowerCase())||null;setFound(m);setLookupDone(true);setUrgent(false);setUrgencyReason("");setUrgencyText("");setComplaint("");}
- function submitAdmission(){if(!found||!canSubmit)return;const id="MC-"+new Date().toISOString().slice(2,10).replaceAll("-","")+"-"+String(cases.length+1).padStart(4,"0");setCases(v=>[{id,name:found.name,memberId:found.cardNo,company:found.company,provider:PROVIDER,status:"Waiting Admission",urgent,submittedAt:Date.now(),issue:complaint,visitType,urgencyReason:urgent?(urgencyReason==="Lainnya"?urgencyText:urgencyReason):undefined,policyNo:found.policyNo,planName:found.planName},...v]);setNotice("Admission berhasil dikirim ke Call Center PertaLife.");setFound(null);setCardNo("");setLookupDone(false);setComplaint("");setUrgent(false);}
+ function submitAdmission(){if(!found||!canSubmit)return;const id="MC-"+new Date().toISOString().slice(2,10).replaceAll("-","")+"-"+String(cases.length+1).padStart(4,"0");setCases(v=>[{id,name:found.name,memberId:found.cardNo,company:found.company,provider:activeProvider.name,providerCode:activeProvider.code,status:"Waiting Admission",urgent,submittedAt:Date.now(),issue:complaint,visitType,urgencyReason:urgent?(urgencyReason==="Lainnya"?urgencyText:urgencyReason):undefined,policyNo:found.policyNo,planName:found.planName},...v]);setNotice("Admission berhasil dikirim ke Call Center PertaLife.");setFound(null);setCardNo("");setLookupDone(false);setComplaint("");setUrgent(false);}
  const decide=(id:string,status:CaseStatus)=>setCases(v=>v.map(c=>c.id===id?{...c,status,submittedAt:Date.now()}:c));
 
  return <div className="shell">
@@ -159,11 +164,11 @@ export default function Page(){
   <div className="sideFoot"><span>Prototype Mode</span><small>Browser data · No production DB</small></div>
  </aside>
  <main>
-  <header><div><h1>{role==="provider"?"Provider Dashboard":"Managed Care Command Center"}</h1><p>{role==="provider"?"Kelola pendaftaran, treatment, dan discharge peserta.":"Master peserta mengikuti struktur data Managed Care PertaLife."}</p></div><div className="switchWrap"><span className="switchLabel">Account Switcher</span><button className="account" onClick={()=>{setRole(role==="provider"?"callcenter":"provider");setView("dashboard");setNotice("")}}><div className="avatar">{role==="provider"?<Building2 size={18}/>:<ShieldCheck size={18}/>}</div><div><b>{role==="provider"?PROVIDER:"Call Center PertaLife"}</b><span>{role==="provider"?"Provider":"Verifier 24/7"}</span></div><ChevronDown size={17}/></button></div></header>
+  <header><div><h1>{role==="provider"?"Provider Dashboard":"Managed Care Command Center"}</h1><p>{role==="provider"?"Kelola pendaftaran, treatment, dan discharge peserta.":"Master peserta mengikuti struktur data Managed Care PertaLife."}</p></div><div className="switchWrap"><span className="switchLabel">Account Switcher</span><div className="account accountSelector"><div className="avatar">{role==="provider"?<Building2 size={18}/>:<ShieldCheck size={18}/>}</div><div className="accountSelectText"><b>{role==="provider"?activeProvider.name:"Call Center PertaLife"}</b><span>{role==="provider"?activeProvider.code:"Verifier 24/7"}</span></div><select aria-label="Account Switcher" value={role==="callcenter"?"callcenter":activeProvider.code} onChange={e=>{const v=e.target.value;if(v==="callcenter"){setRole("callcenter")}else{setRole("provider");setActiveProviderCode(v as typeof activeProviderCode)}setView("dashboard");setNotice("");setFound(null);setLookupDone(false)}}><option value="callcenter">Call Center PertaLife</option>{providerAccounts.map(p=><option key={p.code} value={p.code}>{p.name} — {p.code}</option>)}</select><ChevronDown size={17}/></div></div></header>
   {notice&&<div className="notice">{notice}</div>}
 
   {view==="dashboard"&&<section className="stats">
-   {([["Waiting Admission","Waiting Admission",UserRound],["Waiting Treatment","Waiting Treatment Approval",Stethoscope],["Waiting Discharge","Waiting Discharge",FileCheck2],["Open Cases","Open",Activity]] as const).map(([label,key,Icon])=><button key={label} className={"card stat "+(statusFilter===key?"selected":"")} onClick={()=>setStatusFilter(statusFilter===key?null:key)}><div><span>{label}</span><strong>{key==="Open"?cases.filter(c=>c.status!=="Closed").length:cases.filter(c=>c.status===key).length}</strong></div><div className="icon"><Icon/></div></button>)}
+   {([["Waiting Admission","Waiting Admission",UserRound],["Waiting Treatment","Waiting Treatment Approval",Stethoscope],["Waiting Discharge","Waiting Discharge",FileCheck2],["Open Cases","Open",Activity]] as const).map(([label,key,Icon])=><button key={label} className={"card stat "+(statusFilter===key?"selected":"")} onClick={()=>setStatusFilter(statusFilter===key?null:key)}><div><span>{label}</span><strong>{key==="Open"?visibleCases.filter(c=>c.status!=="Closed").length:visibleCases.filter(c=>c.status===key).length}</strong></div><div className="icon"><Icon/></div></button>)}
   </section>}
 
   {role==="callcenter"&&(view==="dashboard"||view==="master"||view==="eligibility")&&<section className="card master">
@@ -193,11 +198,11 @@ export default function Page(){
   </section>}
 
   {role==="provider"&&(view==="dashboard"||view==="registration")&&<section className="card eligibility">
-   <div><h2>Cek Eligibility Peserta</h2><p>Provider aktif: <b>{PROVIDER}</b>. Cari menggunakan <b>CARD NO</b> dari master peserta PertaLife.</p></div>
+   <div><h2>Cek Eligibility Peserta</h2><p>Provider aktif: <b>{activeProvider.name}</b> · <b>{activeProvider.code}</b>. Cari menggunakan <b>CARD NO</b> dari master peserta PertaLife.</p></div>
    <div className="eligGrid"><label>Card No<input value={cardNo} onChange={e=>setCardNo(e.target.value)} placeholder="Contoh CARD-DUMMY-000001"/></label><label>Jenis Kunjungan<select value={visitType} onChange={e=>setVisitType(e.target.value)}><option>Rawat Jalan</option><option>UGD / IGD</option><option>Emergency Gigi</option></select></label><button className="primary" onClick={lookup}><Search size={17}/>Cek Eligibility</button></div>
    {lookupDone&&!found&&<div className="result bad"><AlertTriangle/><div><b>Peserta tidak ditemukan</b><span>Pastikan CARD NO sudah masuk melalui bulk upload PertaLife.</span></div></div>}
    {found&&<div className="eligResult">
-    <div className="resultTop"><div><span className={"statusDot "+(active?"ok":"no")}>{active?"COVERAGE AKTIF":"COVERAGE TIDAK AKTIF"}</span><h3>{found.name}</h3><p>{found.cardNo} · {found.membershipNo}</p></div><div className={"matchBox "+(faskesMatch?"match":"mismatch")}><b>{!faskesMapped?"Faskes 1 Belum Dimapping":faskesMatch?"Faskes 1 Sesuai":"Faskes 1 Tidak Sesuai"}</b><span>{foundFaskesName||"Mapping diperlukan oleh PertaLife"}{foundFaskesCode?" · "+foundFaskesCode:""}</span></div></div>
+    <div className="resultTop"><div><span className={"statusDot "+(active?"ok":"no")}>{active?"COVERAGE AKTIF":"COVERAGE TIDAK AKTIF"}</span><h3>{found.name}</h3><p>{found.cardNo} · {found.membershipNo}</p></div><div className={"matchBox "+(faskesMatch?"match":"mismatch")}><b>{!faskesMapped?"Faskes 1 Belum Dimapping":faskesMatch?"Faskes 1 Sesuai":"Faskes 1 Tidak Sesuai"}</b><span>{foundFaskesName||"Mapping diperlukan oleh PertaLife"}{foundFaskesCode?" · "+foundFaskesCode:""}</span><small>Matching berdasarkan FASKES 1 CODE</small></div></div>
     <div className="detailGrid detailGridWide">
      <div><span>Perusahaan</span><b>{found.company||"-"}</b></div><div><span>Department</span><b>{found.department||"-"}</b></div><div><span>Relationship</span><b>{relationLabel(found.relation)}</b></div>
      <div><span>Employee</span><b>{found.employeeName||"-"}</b></div><div><span>Employee Membership</span><b>{found.employeeMembershipNo||"-"}</b></div><div><span>DOB</span><b>{niceDate(found.dob)}</b></div>
@@ -212,7 +217,7 @@ export default function Page(){
   {(view==="dashboard"||view==="queue"||view==="treatment"||view==="discharge"||view==="audit")&&<section className="card queue">
    <div className="sectionHead"><div><h2>{role==="provider"?"Case Peserta":"Real-time Verification Queue"}</h2><p>{role==="provider"?"Pantau status verifikasi setiap case yang disubmit.":"Semua admission tetap harus diverifikasi PertaLife."}</p></div><div className="search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Cari case, nama, CARD NO..."/></div></div>
    <div className="tableWrap"><table><thead><tr><th>Case</th><th>Peserta</th><th>Provider / Perusahaan</th><th>Polis / Plan</th><th>Status</th><th>SLA</th>{role==="callcenter"&&<th>Aksi</th>}</tr></thead><tbody>
-    {filtered.length===0?<tr><td colSpan={role==="callcenter"?7:6} className="emptyState"><b>{cases.length===0?"Belum ada case":"Tidak ada case pada filter ini"}</b><small>{cases.length===0?"Case akan muncul setelah Provider submit admission.":"Klik card aktif lagi untuk menghapus filter."}</small></td></tr>:filtered.map(c=><tr key={c.id}><td><b>{c.id}</b><small>{c.issue}</small></td><td><b>{c.name}</b><small>{c.memberId}</small></td><td><b>{c.provider}</b><small>{c.company}</small></td><td><b>{c.policyNo||"-"}</b><small>{c.planName||"-"}</small></td><td><span className={"badge "+(c.urgent?"urgent":"")}>{c.urgent&&<AlertTriangle size={13}/>} {c.status}</span>{c.urgencyReason&&<small>Urgent: {c.urgencyReason}</small>}</td><td><span className="sla"><Clock3 size={14}/>{fmt(now-c.submittedAt)}</span></td>{role==="callcenter"&&<td>{c.status==="Waiting Admission"?<div className="actions"><button className="approve" onClick={()=>decide(c.id,"Treatment Active")}><CheckCircle2 size={15}/>Approve</button><button>Need Confirmation</button><button>Reject</button></div>:<span className="muted">No action</span>}</td>}</tr>)}
+    {filtered.length===0?<tr><td colSpan={role==="callcenter"?7:6} className="emptyState"><b>{visibleCases.length===0?"Belum ada case":"Tidak ada case pada filter ini"}</b><small>{visibleCases.length===0?"Case akan muncul setelah Provider submit admission.":"Klik card aktif lagi untuk menghapus filter."}</small></td></tr>:filtered.map(c=><tr key={c.id}><td><b>{c.id}</b><small>{c.issue}</small></td><td><b>{c.name}</b><small>{c.memberId}</small></td><td><b>{c.provider}</b><small>{c.company}</small></td><td><b>{c.policyNo||"-"}</b><small>{c.planName||"-"}</small></td><td><span className={"badge "+(c.urgent?"urgent":"")}>{c.urgent&&<AlertTriangle size={13}/>} {c.status}</span>{c.urgencyReason&&<small>Urgent: {c.urgencyReason}</small>}</td><td><span className="sla"><Clock3 size={14}/>{fmt(now-c.submittedAt)}</span></td>{role==="callcenter"&&<td>{c.status==="Waiting Admission"?<div className="actions"><button className="approve" onClick={()=>decide(c.id,"Treatment Active")}><CheckCircle2 size={15}/>Approve</button><button>Need Confirmation</button><button>Reject</button></div>:<span className="muted">No action</span>}</td>}</tr>)}
    </tbody></table></div>
   </section>}
   {role==="callcenter"&&(view==="dashboard"||view==="queue")&&<section className="hint"><ShieldCheck/><div><b>Semua case tetap memerlukan verifikasi PertaLife.</b><span>Eligibility hanya membantu review; tidak ada auto-approval.</span></div><b>{waiting.length} waiting</b></section>}
