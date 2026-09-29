@@ -36,3 +36,6 @@ nav button{border:0;background:transparent;width:100%;text-align:left;font-famil
 .reviewStatsClickable .okReview{background:#effaf4;border-color:#d8eee2}.reviewStatsClickable .okReview strong{color:#167147}.reviewStatsClickable .badReview{background:#fff2f1;border-color:#f3d1cd}.reviewStatsClickable .badReview strong{color:#b42318}.reviewStatsClickable .warnReview{background:#fff8ed;border-color:#f0dfbd}.reviewStatsClickable .warnReview strong{color:#a15b20}
 .remarkOk{display:inline-block;padding:5px 8px;border-radius:8px;font-size:10px;font-weight:800;line-height:1.45;background:#effaf4;color:#167147}
 .uploadControls{min-width:auto}
+
+.accountSelector{position:relative;cursor:pointer}.accountSelectText{flex:1;min-width:0}.accountSelectText b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.accountSelector select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;margin:0;padding:0;border:0}.accountSelector>svg{pointer-events:none}
+.matchBox small{display:block;font-size:9px;margin-top:5px;opacity:.72}
