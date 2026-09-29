@@ -37,7 +37,8 @@ export default function Page(){
  const [uploadReview,setUploadReview]=useState<UploadReview|null>(null); const [memberPage,setMemberPage]=useState(1); const [memberPageSize,setMemberPageSize]=useState(50);
 
  useEffect(()=>{try{const m=localStorage.getItem("pertalife-managed-care-members-v2"),c=localStorage.getItem("pertalife-managed-care-cases");if(m)setMembers(JSON.parse(m));if(c)setCases(JSON.parse(c));}catch{}setHydrated(true);const t=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t)},[]);
- useEffect(()=>{if(hydrated){localStorage.setItem("pertalife-managed-care-members-v2",JSON.stringify(members));localStorage.setItem("pertalife-managed-care-cases",JSON.stringify(cases));}},[members,cases,hydrated]);
+ useEffect(()=>{if(hydrated)localStorage.setItem("pertalife-managed-care-members-v2",JSON.stringify(members));},[members,hydrated]);
+ useEffect(()=>{if(hydrated)localStorage.setItem("pertalife-managed-care-cases",JSON.stringify(cases));},[cases,hydrated]);
 
  const waiting=useMemo(()=>cases.filter(c=>c.status.startsWith("Waiting")),[cases]);
  const filtered=cases.filter(c=>(c.name+" "+c.memberId+" "+c.company+" "+c.id).toLowerCase().includes(query.toLowerCase())).filter(c=>statusFilter==="Open"?c.status!=="Closed":statusFilter?c.status===statusFilter:true);
