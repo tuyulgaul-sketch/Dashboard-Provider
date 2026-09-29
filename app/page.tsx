@@ -11,6 +11,8 @@ type Member={
  product:string;planName:string;planCode:string;faskes1:string;
 };
 type CareCase={id:string;name:string;memberId:string;company:string;provider:string;status:CaseStatus;urgent:boolean;submittedAt:number;issue:string;visitType:string;urgencyReason?:string;policyNo?:string;planName?:string};
+type UploadIssue={row:number;cardNo:string;name:string;missing:string[];duplicate:boolean};
+type UploadReview={file:string;total:number;valid:number;incomplete:number;duplicate:number;unmappedFaskes:number;missingHeaders:string[];issues:UploadIssue[];staged:Member[]};
 
 const PROVIDER="RS Hermina Kemayoran";
 const urgencyOptions=["Kecelakaan","Kondisi akut / kegawatdaruratan","Di luar area Faskes 1","Faskes 1 tidak beroperasi","Emergency gigi - dokter gigi umum","Kondisi on-site di lokasi kerja","Lainnya"];
@@ -32,7 +34,7 @@ export default function Page(){
  const [cardNo,setCardNo]=useState(""),[visitType,setVisitType]=useState("Rawat Jalan"),[found,setFound]=useState<Member|null>(null),[lookupDone,setLookupDone]=useState(false);
  const [urgent,setUrgent]=useState(false),[urgencyReason,setUrgencyReason]=useState(""),[urgencyText,setUrgencyText]=useState(""),[complaint,setComplaint]=useState("");
  const [view,setView]=useState("dashboard"),[notice,setNotice]=useState(""),[defaultFaskes,setDefaultFaskes]=useState("");
- const [uploadInfo,setUploadInfo]=useState<{file:string;valid:number;invalid:number;duplicate:number;unmappedFaskes:number;missingHeaders:string[]}|null>(null);
+ const [uploadReview,setUploadReview]=useState<UploadReview|null>(null);
 
  useEffect(()=>{try{const m=localStorage.getItem("pertalife-managed-care-members-v2"),c=localStorage.getItem("pertalife-managed-care-cases");if(m)setMembers(JSON.parse(m));if(c)setCases(JSON.parse(c));}catch{}setHydrated(true);const t=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t)},[]);
  useEffect(()=>{if(hydrated){localStorage.setItem("pertalife-managed-care-members-v2",JSON.stringify(members));localStorage.setItem("pertalife-managed-care-cases",JSON.stringify(cases));}},[members,cases,hydrated]);
@@ -62,25 +64,43 @@ export default function Page(){
     const s=asText(v);const m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);if(m)return m[3]+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0");
     return s.slice(0,10);
    };
-   let invalid=0,duplicate=0,unmappedFaskes=0;
-   const existing=new Set(members.map(m=>m.cardNo.toLowerCase())),batch=new Set<string>(),valid:Member[]=[];
-   for(const r of rows){
-    const cardNo=asText(r["CARD NO"]),name=asText(r["MEMBER NAME"]),company=asText(r["COMPANY"]),membershipNo=asText(r["MEMBERSHIP NO"]),employeeMembershipNo=asText(r["EMPLOYEE MEMBERSHIP NO"]),relation=asText(r["RELATIONSHIP"]);
-    if(!cardNo||!name||!company||!membershipNo||!employeeMembershipNo||!relation){invalid++;continue}
-    const key=cardNo.toLowerCase();if(existing.has(key)||batch.has(key)){duplicate++;continue}batch.add(key);
+   const existing=new Set(members.map(m=>m.cardNo.toLowerCase())),batch=new Set<string>();
+   let incomplete=0,duplicate=0,unmappedFaskes=0;
+   const staged:Member[]=[],issues:UploadIssue[]=[];
+   rows.forEach((r,index)=>{
+    const missing=requiredHeaders.filter(h=>!asText(r[h]));
+    const card=asText(r["CARD NO"]),key=card.toLowerCase();
+    const isDuplicate=!!card&&(existing.has(key)||batch.has(key));
+    if(card&&!isDuplicate)batch.add(key);
+    if(missing.length)incomplete++;
+    if(isDuplicate)duplicate++;
+    if(missing.length||isDuplicate){
+     issues.push({row:index+2,cardNo:card||"-",name:asText(r["MEMBER NAME"])||"-",missing,duplicate:isDuplicate});
+     return;
+    }
     const rowFaskes=asText(r["FASKES 1"]||r["FASKES1"])||defaultFaskes.trim();if(!rowFaskes)unmappedFaskes++;
-    valid.push({
-     policyNo:asText(r["POLICYNO"]),company,department:asText(r["DEPARTMENT"]),startDate:asDate(r["START DATE"]),endDate:asDate(r["END DATE"]),
-     membershipNo,name,employeeName:asText(r["EMPLOYEE NAME"]),employeeMembershipNo,dob:asDate(r["DOB"]),inception:asDate(r["INCEPTION"]),expiry:asDate(r["EXPIRY"]),
-     gender:asText(r["GENDER"]),maritalStatus:asText(r["MARITAL STATUS"]),relation,cardNo,product:asText(r["PRODUCT"]),planName:asText(r["PLAN NAME"]),planCode:asText(r["PLAN CODE"]),faskes1:rowFaskes
+    staged.push({
+     policyNo:asText(r["POLICYNO"]),company:asText(r["COMPANY"]),department:asText(r["DEPARTMENT"]),startDate:asDate(r["START DATE"]),endDate:asDate(r["END DATE"]),
+     membershipNo:asText(r["MEMBERSHIP NO"]),name:asText(r["MEMBER NAME"]),employeeName:asText(r["EMPLOYEE NAME"]),employeeMembershipNo:asText(r["EMPLOYEE MEMBERSHIP NO"]),dob:asDate(r["DOB"]),inception:asDate(r["INCEPTION"]),expiry:asDate(r["EXPIRY"]),
+     gender:asText(r["GENDER"]),maritalStatus:asText(r["MARITAL STATUS"]),relation:asText(r["RELATIONSHIP"]),cardNo:card,product:asText(r["PRODUCT"]),planName:asText(r["PLAN NAME"]),planCode:asText(r["PLAN CODE"]),faskes1:rowFaskes
     });
-   }
-   setMembers(v=>[...valid,...v]);setUploadInfo({file:file.name,valid:valid.length,invalid,duplicate,unmappedFaskes,missingHeaders});
-   setNotice(valid.length?valid.length+" peserta berhasil diupload ke Master Peserta.":"Tidak ada data baru yang dapat diupload.");
-  }catch{setNotice("File Excel tidak dapat dibaca. Pastikan struktur kolom sesuai master peserta Managed Care.");}
+   });
+   setUploadReview({file:file.name,total:rows.length,valid:staged.length,incomplete,duplicate,unmappedFaskes,missingHeaders,issues,staged});
+   setNotice("File berhasil dibaca. Review hasil validasi sebelum Confirm Upload.");
+  }catch{
+   setUploadReview(null);
+   setNotice("File Excel tidak dapat dibaca. Pastikan struktur kolom sesuai master peserta Managed Care.");
+  }
   e.target.value="";
  }
-
+ function confirmUpload(){
+  if(!uploadReview)return;
+  const blocked=uploadReview.missingHeaders.length>0||uploadReview.incomplete>0||uploadReview.duplicate>0;
+  if(blocked){setNotice("Upload diblokir. Perbaiki seluruh error pada file lalu pilih ulang file Excel.");return}
+  setMembers(v=>[...uploadReview.staged,...v]);
+  setNotice(uploadReview.valid+" peserta berhasil diupload ke Master Peserta.");
+  setUploadReview(null);
+ }
  function lookup(){const m=members.find(x=>x.cardNo.toLowerCase()===cardNo.trim().toLowerCase())||null;setFound(m);setLookupDone(true);setUrgent(false);setUrgencyReason("");setUrgencyText("");setComplaint("");}
  function submitAdmission(){if(!found||!canSubmit)return;const id="MC-"+new Date().toISOString().slice(2,10).replaceAll("-","")+"-"+String(cases.length+1).padStart(4,"0");setCases(v=>[{id,name:found.name,memberId:found.cardNo,company:found.company,provider:PROVIDER,status:"Waiting Admission",urgent,submittedAt:Date.now(),issue:complaint,visitType,urgencyReason:urgent?(urgencyReason==="Lainnya"?urgencyText:urgencyReason):undefined,policyNo:found.policyNo,planName:found.planName},...v]);setNotice("Admission berhasil dikirim ke Call Center PertaLife.");setFound(null);setCardNo("");setLookupDone(false);setComplaint("");setUrgent(false);}
  const decide=(id:string,status:CaseStatus)=>setCases(v=>v.map(c=>c.id===id?{...c,status,submittedAt:Date.now()}:c));
@@ -115,7 +135,19 @@ export default function Page(){
    <div className="sectionHead"><div><h2>Master Peserta Managed Care</h2><p>Struktur upload: 19 kolom master peserta existing. Lookup utama Provider menggunakan CARD NO.</p></div><span className="countPill">{members.length} peserta</span></div>
    {(view==="dashboard"||view==="master")&&<>
     <div className="bulkBox"><div className="bulkIcon"><FileSpreadsheet/></div><div><b>Bulk Upload Data Peserta</b><span>POLICYNO, COMPANY, DEPARTMENT, START/END DATE, membership, data keluarga, CARD NO, PRODUCT, PLAN NAME, PLAN CODE.</span></div><div className="uploadControls"><label>Default Faskes 1 <input value={defaultFaskes} onChange={e=>setDefaultFaskes(e.target.value)} placeholder="Opsional, contoh RS Hermina Kemayoran"/></label><label className="uploadBtn"><Upload size={17}/>Pilih File Excel<input type="file" accept=".xlsx,.xls" onChange={bulkUpload}/></label></div></div>
-    {uploadInfo&&<div className="uploadSummary"><b>{uploadInfo.file}</b><span className="good">{uploadInfo.valid} imported</span><span>{uploadInfo.duplicate} duplicate</span><span className={uploadInfo.invalid?"badText":""}>{uploadInfo.invalid} invalid</span><span className={uploadInfo.unmappedFaskes?"warnText":""}>{uploadInfo.unmappedFaskes} tanpa Faskes 1</span>{uploadInfo.missingHeaders.length>0&&<span className="badText">Header tidak ditemukan: {uploadInfo.missingHeaders.join(", ")}</span>}</div>}
+    {uploadReview&&<div className="reviewPanel">
+     <div className="reviewHead"><div><b>Review Upload: {uploadReview.file}</b><span>Data belum masuk Master Peserta sampai lo menekan Confirm Upload.</span></div><button className="reviewClear" onClick={()=>setUploadReview(null)}>Batalkan Review</button></div>
+     <div className="reviewStats">
+      <div><span>Total Row</span><strong>{uploadReview.total}</strong></div>
+      <div className="okReview"><span>Lengkap</span><strong>{uploadReview.valid}</strong></div>
+      <div className={uploadReview.incomplete?"badReview":""}><span>Tidak Lengkap</span><strong>{uploadReview.incomplete}</strong></div>
+      <div className={uploadReview.duplicate?"badReview":""}><span>Duplicate Card</span><strong>{uploadReview.duplicate}</strong></div>
+      <div className={uploadReview.unmappedFaskes?"warnReview":""}><span>Tanpa Faskes 1</span><strong>{uploadReview.unmappedFaskes}</strong></div>
+     </div>
+     {uploadReview.missingHeaders.length>0&&<div className="reviewBlocker"><AlertTriangle size={18}/><div><b>Header wajib belum lengkap</b><span>{uploadReview.missingHeaders.join(", ")}</span></div></div>}
+     {uploadReview.issues.length>0&&<div className="issueWrap"><div className="issueTitle"><b>Data yang harus diperbaiki</b><span>Menampilkan maksimal 100 issue pertama dari file.</span></div><table><thead><tr><th>Row Excel</th><th>Card No</th><th>Member Name</th><th>Masalah</th></tr></thead><tbody>{uploadReview.issues.slice(0,100).map((x,i)=><tr key={i}><td><b>{x.row}</b></td><td>{x.cardNo}</td><td>{x.name}</td><td>{x.missing.length>0&&<span className="issueTag">Kosong: {x.missing.join(", ")}</span>}{x.duplicate&&<span className="issueTag duplicateTag">Duplicate CARD NO</span>}</td></tr>)}</tbody></table></div>}
+     <div className="reviewActions"><span>{uploadReview.missingHeaders.length||uploadReview.incomplete||uploadReview.duplicate?<><AlertTriangle size={16}/> Upload dikunci sampai seluruh error diperbaiki.</>:<><CheckCircle2 size={16}/> Semua data lolos validasi dan siap diupload.</>}</span><button className="primary" disabled={uploadReview.missingHeaders.length>0||uploadReview.incomplete>0||uploadReview.duplicate>0||uploadReview.total===0} onClick={confirmUpload}><CheckCircle2 size={17}/>Confirm Upload {uploadReview.valid} Peserta</button></div>
+    </div>}
    </>}
    <div className="masterToolbar"><div className="search"><Search size={16}/><input value={memberQuery} onChange={e=>setMemberQuery(e.target.value)} placeholder="Cari CARD NO, nama, membership, pekerja, perusahaan..."/></div><small>{filteredMembers.length} dari {members.length} peserta</small></div>
    <div className="miniTable"><table><thead><tr><th>Card / Membership</th><th>Peserta & Relasi</th><th>Pekerja</th><th>Perusahaan</th><th>Polis / Plan</th><th>Periode</th><th>Faskes 1</th><th>Status</th></tr></thead><tbody>
