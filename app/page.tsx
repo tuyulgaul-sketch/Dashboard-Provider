@@ -345,7 +345,7 @@ export default function Page(){
   setShowCaseDetail(false);setSelectedCaseId(null);setFkrtlBenefitCard(null);setNotice("");
  }
  function submitAdmission(){
- if(!found||!canSubmit||careAccess==="FKRTL")return;
+ if(!found||!canSubmit)return;
  const id="MC-"+new Date().toISOString().slice(2,10).replaceAll("-","")+"-"+String(cases.length+1).padStart(4,"0");
  const at=Date.now(),isEmergency=careAccess==="Emergency";
  const admissionLevel=isEmergency&&activeProvider.code==="PRV-HERMINA-KMY-001"?"FKRTL":"FKTP";
@@ -353,7 +353,7 @@ export default function Page(){
   id,name:found.name,memberId:found.cardNo,company:found.company,
   provider:activeProvider.name,providerCode:activeProvider.code,status:"Waiting Admission",
   urgent:isEmergency||urgent,submittedAt:at,issue:complaint,visitType:isEmergency?(activeProvider.code==="PRV-HERMINA-KMY-001"?"UGD / IGD":"Pertolongan Darurat Awal"):visitType,
-  careLevel:admissionLevel,accessRoute:careAccess,
+  careLevel:admissionLevel,accessRoute:isEmergency?"Emergency":"FKTP",
   urgencyReason:isEmergency?"Penilaian awal gawat darurat: "+complaint.trim():urgent?(urgencyReason==="Lainnya"?urgencyText:urgencyReason):undefined,
   policyNo:found.policyNo,planName:found.planName,
   history:[{at,actor:activeProvider.name,event:isEmergency?"Emergency Admission Submitted":"FKTP Admission Submitted",detail:complaint}]
