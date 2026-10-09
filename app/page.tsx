@@ -195,7 +195,9 @@ export default function Page(){
  const [role,setRole]=useState<Role>("provider"),[activeProviderCode,setActiveProviderCode]=useState(providerAccounts[0].code),[now,setNow]=useState(Date.now()),[cases,setCases]=useState<CareCase[]>([]),[members,setMembers]=useState<Member[]>([]);
  const [query,setQuery]=useState(""),[memberQuery,setMemberQuery]=useState(""),[statusFilter,setStatusFilter]=useState<CaseStatus|"Open"|null>(null),[hydrated,setHydrated]=useState(false);
  const [cardNo,setCardNo]=useState(""),[visitType,setVisitType]=useState("Rawat Jalan"),[found,setFound]=useState<Member|null>(null),[lookupDone,setLookupDone]=useState(false);
- const [careAccess,setCareAccess]=useState<"FKTP"|"Emergency">("FKTP");
+ const [careAccess,setCareAccess]=useState<"FKTP"|"FKRTL"|"Emergency">("FKTP");
+ const [referralSearch,setReferralSearch]=useState("");
+ const [fkrtlBenefitCard,setFkrtlBenefitCard]=useState<string|null>(null);
  const [urgent,setUrgent]=useState(false),[urgencyReason,setUrgencyReason]=useState(""),[urgencyText,setUrgencyText]=useState(""),[complaint,setComplaint]=useState("");
  const [view,setView]=useState("dashboard"),[notice,setNotice]=useState("");
  const [selectedCaseId,setSelectedCaseId]=useState<string|null>(null),[showCaseDetail,setShowCaseDetail]=useState(false);
@@ -219,6 +221,11 @@ export default function Page(){
  },[bankSearch]);
  const visibleCases=useMemo(()=>role==="provider"?cases.filter(c=>c.providerCode===activeProvider.code||(!c.providerCode&&c.provider===activeProvider.name)):cases,[cases,role,activeProvider.code,activeProvider.name]);
  const waiting=useMemo(()=>visibleCases.filter(c=>c.status.startsWith("Waiting")),[visibleCases]);
+ const approvedFKRTLCases=useMemo(()=>visibleCases
+  .filter(c=>c.careLevel==="FKRTL"&&c.accessRoute==="Referral"&&!!c.originReferralId)
+  .sort((a,b)=>b.submittedAt-a.submittedAt),[visibleCases]);
+ const filteredFKRTLCases=approvedFKRTLCases.filter(c=>(c.name+" "+c.memberId+" "+c.id+" "+(c.specialty||"")).toLowerCase().includes(referralSearch.trim().toLowerCase()));
+ const fkrtlBenefitMember=fkrtlBenefitCard?members.find(m=>m.cardNo.toLowerCase()===fkrtlBenefitCard.toLowerCase()):null;
  const pendingReferrals=cases.filter(c=>c.referral?.status==="Pending Verification");
  const eligibleReferralIds=visibleCases.filter(c=>{
   if((c.careLevel||"FKTP")!=="FKTP"||c.accessRoute==="Emergency")return false;
@@ -263,7 +270,7 @@ export default function Page(){
  const foundFaskesCode=found?faskesCode(found):"";
  const faskesMapped=!!found&&!!foundFaskesName&&!!foundFaskesCode;
  const faskesMatch=!!found&&foundFaskesCode.trim().toLowerCase()===activeProvider.code.toLowerCase();
- const canSubmit=!!found&&active&&!!complaint.trim()&&(careAccess==="Emergency" || faskesMatch ||(urgent&&!!urgencyReason&&(urgencyReason!=="Lainnya"||!!urgencyText.trim())));
+ const canSubmit=careAccess!=="FKRTL"&&!!found&&active&&!!complaint.trim()&&(careAccess==="Emergency"||faskesMatch||(urgent&&!!urgencyReason&&(urgencyReason!=="Lainnya"||!!urgencyText.trim())));
 
  async function bulkUpload(e:React.ChangeEvent<HTMLInputElement>){
   const file=e.target.files?.[0];if(!file)return;
@@ -332,22 +339,27 @@ export default function Page(){
   setNotice("Seluruh data Master Peserta berhasil dihapus.");
  }
  function lookup(){const m=members.find(x=>x.cardNo.toLowerCase()===cardNo.trim().toLowerCase())||null;setFound(m);setLookupDone(true);setUrgent(false);setUrgencyReason("");setUrgencyText("");setComplaint("");}
+ function chooseAccess(route:"FKTP"|"FKRTL"|"Emergency"){
+  setCareAccess(route);setVisitType(route==="Emergency"?"UGD / IGD":"Rawat Jalan");
+  setFound(null);setLookupDone(false);setComplaint("");setUrgent(false);setUrgencyReason("");setUrgencyText("");
+  setShowCaseDetail(false);setSelectedCaseId(null);setFkrtlBenefitCard(null);setNotice("");
+ }
  function submitAdmission(){
- if(!found||!canSubmit)return;
+ if(!found||!canSubmit||careAccess==="FKRTL")return;
  const id="MC-"+new Date().toISOString().slice(2,10).replaceAll("-","")+"-"+String(cases.length+1).padStart(4,"0");
  const at=Date.now(),isEmergency=careAccess==="Emergency";
  const admissionLevel=isEmergency&&activeProvider.code==="PRV-HERMINA-KMY-001"?"FKRTL":"FKTP";
  setCases(v=>[{
   id,name:found.name,memberId:found.cardNo,company:found.company,
   provider:activeProvider.name,providerCode:activeProvider.code,status:"Waiting Admission",
-  urgent:isEmergency||urgent,submittedAt:at,issue:complaint,visitType:isEmergency?"UGD / IGD":visitType,
+  urgent:isEmergency||urgent,submittedAt:at,issue:complaint,visitType:isEmergency?(activeProvider.code==="PRV-HERMINA-KMY-001"?"UGD / IGD":"Pertolongan Darurat Awal"):visitType,
   careLevel:admissionLevel,accessRoute:careAccess,
   urgencyReason:isEmergency?"Penilaian awal gawat darurat: "+complaint.trim():urgent?(urgencyReason==="Lainnya"?urgencyText:urgencyReason):undefined,
   policyNo:found.policyNo,planName:found.planName,
   history:[{at,actor:activeProvider.name,event:isEmergency?"Emergency Admission Submitted":"FKTP Admission Submitted",detail:complaint}]
  },...v]);
  setNotice(isEmergency?"Emergency tercatat dan dikirim untuk verifikasi Call Center. Penanganan kegawatdaruratan tidak boleh tertunda karena administrasi.":"Admission FKTP dikirim ke Call Center PertaLife.");
- setFound(null);setCardNo("");setLookupDone(false);setComplaint("");setUrgent(false);setCareAccess("FKTP");setVisitType("Rawat Jalan");
+ setFound(null);setCardNo("");setLookupDone(false);setComplaint("");setUrgent(false);setCareAccess("FKTP");setVisitType("Rawat Jalan");setReferralSearch("");
 }
  function openReferral(id:string){setSelectedCaseId(id);setShowCaseDetail(false);setView("referrals");setNotice("");}
  function submitReferral(caseId:string,draft:ReferralDraft){
@@ -510,7 +522,7 @@ export default function Page(){
   <div className="sideFoot"><span>Prototype Mode</span><small>Browser data · No production DB</small></div>
  </aside>
  <main>
-  <header><div><h1>{role==="provider"?"Provider Dashboard":"Managed Care Command Center"}</h1><p>{role==="provider"?"Kelola pendaftaran, treatment, dan discharge peserta.":"Master peserta mengikuti struktur data Managed Care PertaLife."}</p></div><div className="switchWrap"><span className="switchLabel">Account Switcher</span><div className="account accountSelector"><div className="avatar">{role==="provider"?<Building2 size={18}/>:<ShieldCheck size={18}/>}</div><div className="accountSelectText"><b>{role==="provider"?activeProvider.name:"Call Center PertaLife"}</b><span>{role==="provider"?activeProvider.code:"Verifier 24/7"}</span></div><select aria-label="Account Switcher" value={role==="callcenter"?"callcenter":activeProvider.code} onChange={e=>{const v=e.target.value;if(v==="callcenter"){setRole("callcenter")}else{setRole("provider");setActiveProviderCode(v as typeof activeProviderCode)}setView("dashboard");setNotice("");setFound(null);setLookupDone(false);setProfileDraft(null);setBankSearch("");setBankOpen(false)}}><option value="callcenter">Call Center PertaLife</option>{providerAccounts.map(p=><option key={p.code} value={p.code}>{p.name} — {p.code}</option>)}</select><ChevronDown size={17}/></div></div></header>
+  <header><div><h1>{role==="provider"?"Provider Dashboard":"Managed Care Command Center"}</h1><p>{role==="provider"?"Kelola pendaftaran, treatment, dan discharge peserta.":"Master peserta mengikuti struktur data Managed Care PertaLife."}</p></div><div className="switchWrap"><span className="switchLabel">Account Switcher</span><div className="account accountSelector"><div className="avatar">{role==="provider"?<Building2 size={18}/>:<ShieldCheck size={18}/>}</div><div className="accountSelectText"><b>{role==="provider"?activeProvider.name:"Call Center PertaLife"}</b><span>{role==="provider"?activeProvider.code:"Verifier 24/7"}</span></div><select aria-label="Account Switcher" value={role==="callcenter"?"callcenter":activeProvider.code} onChange={e=>{const v=e.target.value;if(v==="callcenter"){setRole("callcenter")}else{setRole("provider");setActiveProviderCode(v as typeof activeProviderCode)}setView("dashboard");setCareAccess("FKTP");setVisitType("Rawat Jalan");setReferralSearch("");setFkrtlBenefitCard(null);setNotice("");setFound(null);setLookupDone(false);setProfileDraft(null);setBankSearch("");setBankOpen(false)}}><option value="callcenter">Call Center PertaLife</option>{providerAccounts.map(p=><option key={p.code} value={p.code}>{p.name} — {p.code}</option>)}</select><ChevronDown size={17}/></div></div></header>
   {notice&&<div className="notice">{notice}</div>}
 
   {view==="dashboard"&&<section className="stats">
@@ -571,14 +583,33 @@ export default function Page(){
   </section>}
 
   {role==="provider"&&(view==="dashboard"||view==="registration")&&<section className="card eligibility">
-   <div><h2>Cek Eligibility Peserta</h2><p>Provider aktif: <b>{activeProvider.name}</b> · <b>{activeProvider.code}</b>. Cari menggunakan <b>CARD NO</b> dari master peserta PertaLife.</p></div>
-   <div className="accessMode">
-    <label>Jalur Pelayanan Awal<select value={careAccess} onChange={e=>{const next=e.target.value as "FKTP"|"Emergency";setCareAccess(next);setUrgent(false);setUrgencyReason("");setUrgencyText("");setVisitType(next==="Emergency"?"UGD / IGD":"Rawat Jalan");}}>
-     <option value="FKTP">FKTP Terdaftar — Pemeriksaan Awal</option><option value="Emergency">Gawat Darurat — Tanpa Rujukan Awal</option>
-    </select></label>
-    <div className="accessModeNote"><ShieldCheck size={17}/><span>{careAccess==="Emergency"?"Kondisi gawat darurat dinilai secara medis. Pelayanan darurat tidak boleh tertunda oleh proses administrasi; verifikasi penjaminan tetap dilakukan.":activeProvider.code==="PRV-HERMINA-KMY-001"?"Hermina berperan sebagai FKTP dan FKRTL. Kunjungan awal harus sesuai Faskes 1; layanan spesialis melalui rujukan yang sudah di-approve Call Center.":"Kimia Farma berperan sebagai FKTP. Apabila perlu spesialis, buat rujukan ke FKRTL Hermina setelah Admission FKTP di-approve."}</span></div>
+   <div><h2>Pendaftaran & Eligibility Peserta</h2><p>Provider: <b>{activeProvider.name}</b> · <b>{activeProvider.code}</b>. Pilih jalur pasien terlebih dahulu, lalu lakukan pengecekan peserta atau buka rujukan yang sudah disetujui.</p></div>
+   <div className="entryPathIntro"><span className="entryStepTag">LANGKAH 1 · JALUR KEDATANGAN PASIEN</span><h3>Pasien datang untuk pelayanan apa?</h3><p>Pilih sesuai kondisi kedatangan pasien. Sistem akan menampilkan alur verifikasi yang sesuai.</p></div>
+   <div className="entryPathCards" role="group" aria-label="Pilih jalur akses pelayanan">
+    <button type="button" className={"entryPathCard "+(careAccess==="FKTP"?"selected":"")} aria-pressed={careAccess==="FKTP"} onClick={()=>chooseAccess("FKTP")}>
+     <span className="entryPathIcon"><Stethoscope size={22}/></span>
+     <span className="entryPathText"><strong>FKTP · Pemeriksaan Awal</strong><small>Dokter umum atau dokter gigi; pasien terdaftar pada Faskes 1 ini.</small><em>Verifikasi Faskes 1 & kepesertaan</em></span>
+     <CheckCircle2 className="entryPathCheck" size={18}/>
+    </button>
+    {activeProvider.code==="PRV-HERMINA-KMY-001"&&<button type="button" className={"entryPathCard "+(careAccess==="FKRTL"?"selected":"")} aria-pressed={careAccess==="FKRTL"} onClick={()=>chooseAccess("FKRTL")}>
+     <span className="entryPathIcon"><Building2 size={22}/></span>
+     <span className="entryPathText"><strong>FKRTL · Rujukan Spesialis</strong><small>Pasien sudah dirujuk dan disetujui Call Center PertaLife.</small><em>Buka episode FKRTL yang sudah dibuat</em></span>
+     <CheckCircle2 className="entryPathCheck" size={18}/>
+    </button>}
+    <button type="button" className={"entryPathCard emergency "+(careAccess==="Emergency"?"selected":"")} aria-pressed={careAccess==="Emergency"} onClick={()=>chooseAccess("Emergency")}>
+     <span className="entryPathIcon"><AlertTriangle size={22}/></span>
+     <span className="entryPathText"><strong>{activeProvider.code==="PRV-HERMINA-KMY-001"?"IGD · Gawat Darurat":"Pertolongan Darurat Awal"}</strong><small>{activeProvider.code==="PRV-HERMINA-KMY-001"?"Pasien gawat darurat datang langsung ke IGD, tanpa surat rujukan awal.":"Penilaian, pertolongan awal, dan koordinasi rujukan darurat sesuai kemampuan klinik."}</small><em>{activeProvider.code==="PRV-HERMINA-KMY-001"?"Tidak perlu rujukan awal":"Bukan unit IGD rumah sakit"}</em></span>
+     <CheckCircle2 className="entryPathCheck" size={18}/>
+    </button>
    </div>
-   <div className="eligGrid"><label>Card No<input value={cardNo} onChange={e=>setCardNo(e.target.value)} placeholder="Contoh CARD-DUMMY-000001"/></label><label>Jenis Kunjungan{careAccess==="Emergency"?<input readOnly value="UGD / IGD (Emergency)"/>:<select value={visitType} onChange={e=>setVisitType(e.target.value)}><option value="Rawat Jalan">Rawat Jalan FKTP</option><option value="Rawat Jalan Gigi">Rawat Jalan Gigi FKTP</option></select>}</label><button className="primary" onClick={lookup}><Search size={17}/>Cek Eligibility</button></div>
+   {careAccess==="FKRTL"?<div className="referralEntry">
+    <div className="referralEntryIntro"><div><span className="entryStepTag">LANGKAH 2 · EPISODE YANG SUDAH DISETUJUI</span><h3>Daftar Rujukan ke FKRTL Hermina</h3><p>Episode FKRTL dibuat otomatis saat Call Center menyetujui rujukan internal maupun eksternal. <b>Jangan membuat Admission baru untuk rujukan yang sama.</b></p></div><span className="countPill">{approvedFKRTLCases.length} episode</span></div>
+    <label className="referralEntrySearch"><Search size={17}/><input aria-label="Cari episode FKRTL" value={referralSearch} onChange={e=>setReferralSearch(e.target.value)} placeholder="Cari nama, CARD NO, Case ID, atau poli spesialis..."/></label>
+    {filteredFKRTLCases.length===0?<div className="referralEntryEmpty"><ShieldCheck size={20}/><div><strong>{approvedFKRTLCases.length?"Tidak ditemukan episode sesuai pencarian.":"Belum ada rujukan yang disetujui."}</strong><p>Rujukan dibuat dari episode FKTP (Kimia Farma atau Hermina), lalu diverifikasi melalui Referral Approval Call Center. Setelah Approved, episode FKRTL otomatis muncul di sini.</p></div></div>:<div className="referralEntryList">{filteredFKRTLCases.map(c=><div className="referralEntryRow" key={c.id}><div><strong>{c.name}</strong><small>{c.memberId} · {c.id}</small><small>Poli: {c.specialty||"Rujukan Spesialis"} · FKTP asal: {c.parentCaseId||"-"}</small></div><div className="referralEntryActions"><span className={"statusDot "+(c.status==="Closed"?"no":"ok")}>{c.status}</span><button type="button" className="reviewClear" onClick={()=>openCaseDetail(c.id)}><Eye size={15}/>Detail</button><button type="button" className="reviewClear" aria-pressed={fkrtlBenefitCard===c.memberId} onClick={()=>setFkrtlBenefitCard(current=>current===c.memberId?null:c.memberId)}><ShieldCheck size={15}/>Benefit & Limit</button>{c.status==="Treatment Active"&&<button type="button" className="primary" onClick={()=>openTreatment(c.id)}><Stethoscope size={16}/>Treatment Request</button>}</div></div>)}</div>}
+    <div className="referralEntryNotice"><ShieldCheck size={17}/><span>Approval rujukan adalah izin memulai pelayanan spesialis sesuai rujukan. Tindakan lanjutan tetap mengikuti proses Treatment Request dan batasan benefit.</span></div>
+   </div>:<>
+    <div className="entryPathInstruction"><span className="entryStepTag">LANGKAH 2 · VERIFIKASI PESERTA</span><div className="accessModeNote"><ShieldCheck size={17}/><span>{careAccess==="Emergency"?(activeProvider.code==="PRV-HERMINA-KMY-001"?"Lakukan asesmen kegawatdaruratan dan stabilisasi segera. Administrasi penjaminan dan verifikasi Call Center tidak boleh menunda penanganan medis.":"Lakukan pertolongan awal sesuai kemampuan klinik; koordinasikan transfer darurat bila diperlukan. Penjaminan tetap diverifikasi PertaLife."):"Cek kepesertaan dan kecocokan Faskes 1. Jika memerlukan spesialis, dokter FKTP membuat rujukan dari episode yang sudah disetujui."}</span></div></div>
+    <div className="eligGrid"><label>Card No<input value={cardNo} onChange={e=>setCardNo(e.target.value)} placeholder="Contoh CARD-DUMMY-000001"/></label><label>{careAccess==="Emergency"?"Jenis Pelayanan":"Pelayanan FKTP"}{careAccess==="Emergency"?<input readOnly value={activeProvider.code==="PRV-HERMINA-KMY-001"?"IGD / Gawat Darurat":"Pertolongan Darurat Awal"}/>:<select value={visitType} onChange={e=>setVisitType(e.target.value)}><option value="Rawat Jalan">Rawat Jalan Dokter Umum</option><option value="Rawat Jalan Gigi">Rawat Jalan Dokter Gigi</option></select>}</label><button className="primary" onClick={lookup}><Search size={17}/>Cek Eligibility</button></div>
    {lookupDone&&!found&&<div className="result bad"><AlertTriangle/><div><b>Peserta tidak ditemukan</b><span>Pastikan CARD NO sudah masuk melalui bulk upload PertaLife.</span></div></div>}
    {found&&<div className="eligResult">
     <div className="resultTop"><div><span className={"statusDot "+(active?"ok":"no")}>{active?"COVERAGE AKTIF":"COVERAGE TIDAK AKTIF"}</span><h3>{found.name}</h3><p>{found.cardNo} · {found.membershipNo}</p></div><div className={"matchBox "+(careAccess==="Emergency"||faskesMatch?"match":"mismatch")}><b>{careAccess==="Emergency"?"Jalur Emergency — Rujukan Awal Tidak Wajib":!faskesMapped?"Faskes 1 Belum Dimapping":faskesMatch?"Faskes 1 Sesuai":"Faskes 1 Tidak Sesuai"}</b><span>{foundFaskesName||"Mapping diperlukan oleh PertaLife"}{foundFaskesCode?" · "+foundFaskesCode:""}</span><small>{careAccess==="Emergency"?"Perlu asesmen medis & verifikasi PertaLife":"Matching berdasarkan FASKES 1 CODE"}</small></div></div>
@@ -588,11 +619,13 @@ export default function Page(){
      <div><span>Gender / Marital</span><b>{found.gender||"-"} / {found.maritalStatus||"-"}</b></div><div><span>Policy No</span><b>{found.policyNo||"-"}</b></div><div><span>Product</span><b>{found.product||"-"}</b></div>
      <div><span>Plan</span><b>{found.planName||"-"} {found.planCode?"("+found.planCode+")":""}</b></div><div><span>Coverage</span><b>{niceDate(found.inception||found.startDate)} - {niceDate(found.expiry||found.endDate)}</b></div><div><span>Card No</span><b>{found.cardNo}</b></div>
     </div>
-    {careAccess==="FKTP"&&!faskesMatch&&active&&<div className="override"><label className="check"><input type="checkbox" checked={urgent} onChange={e=>setUrgent(e.target.checked)}/>Override sebagai Urgent</label>{urgent&&<><label>Alasan Urgent<select value={urgencyReason} onChange={e=>setUrgencyReason(e.target.value)}><option value="">Pilih alasan</option>{urgencyOptions.map(x=><option key={x}>{x}</option>)}</select></label>{urgencyReason==="Lainnya"&&<label>Penjelasan<input value={urgencyText} onChange={e=>setUrgencyText(e.target.value)} placeholder="Jelaskan alasan urgency"/></label>}</>}</div>}
-    <div className="admissionBox"><label>Keluhan / Indikasi *<textarea value={complaint} onChange={e=>setComplaint(e.target.value)} placeholder="Jelaskan keluhan utama peserta"/></label><button className="primary" disabled={!canSubmit} onClick={submitAdmission}>Submit Admission <ArrowRight size={17}/></button>{!active&&<small>Coverage peserta sedang tidak aktif berdasarkan periode INCEPTION/EXPIRY atau START/END DATE.</small>}{careAccess==="Emergency"&&<small>Jalur emergency mengikuti asesmen kegawatdaruratan. Admission tetap diverifikasi Call Center; penanganan pasien tidak ditunda.</small>}{careAccess==="FKTP"&&active&&!faskesMatch&&!urgent&&<small>{faskesMapped?"Submit terkunci karena Faskes 1 tidak sesuai.":"Submit normal terkunci karena Faskes 1 belum dimapping."} Aktifkan Urgent untuk meminta override.</small>}</div>
+    {careAccess==="FKTP"&&!faskesMatch&&active&&<div className="override"><label className="check"><input type="checkbox" checked={urgent} onChange={e=>setUrgent(e.target.checked)}/>Ajukan pengecualian Faskes 1 (butuh verifikasi)</label>{urgent&&<><label>Alasan Urgent<select value={urgencyReason} onChange={e=>setUrgencyReason(e.target.value)}><option value="">Pilih alasan</option>{urgencyOptions.map(x=><option key={x}>{x}</option>)}</select></label>{urgencyReason==="Lainnya"&&<label>Penjelasan<input value={urgencyText} onChange={e=>setUrgencyText(e.target.value)} placeholder="Jelaskan alasan urgency"/></label>}</>}</div>}
+    <div className="admissionBox"><label>{careAccess==="Emergency"?"Hasil Triase / Asesmen Darurat *":"Keluhan / Indikasi *"}<textarea value={complaint} onChange={e=>setComplaint(e.target.value)} placeholder={careAccess==="Emergency"?"Jelaskan kondisi darurat, hasil triase, tanda vital bila ada, dan penanganan awal...":"Jelaskan keluhan utama peserta"}/></label><button className="primary" disabled={!canSubmit} onClick={submitAdmission}>{careAccess==="Emergency"?"Submit Admission Darurat":"Submit Admission FKTP"} <ArrowRight size={17}/></button>{!active&&<small>Coverage peserta sedang tidak aktif berdasarkan periode INCEPTION/EXPIRY atau START/END DATE.</small>}{careAccess==="Emergency"&&<small>Jalur emergency mengikuti asesmen kegawatdaruratan. Admission tetap diverifikasi Call Center; penanganan pasien tidak ditunda.</small>}{careAccess==="FKTP"&&active&&!faskesMatch&&!urgent&&<small>{faskesMapped?"Submit terkunci karena Faskes 1 tidak sesuai.":"Submit normal terkunci karena Faskes 1 belum dimapping."} Aktifkan permintaan pengecualian jika diperlukan; Call Center tetap harus memverifikasi.</small>}</div>
    </div>}
+   </>}
   </section>}
-  {role==="provider"&&(view==="dashboard"||view==="registration")&&found&&<BenefitCoverage key={found.cardNo} member={found} memberActive={active} variant="provider"/>}
+  {role==="provider"&&(view==="dashboard"||view==="registration")&&found&&careAccess!=="FKRTL"&&<BenefitCoverage key={found.cardNo} member={found} memberActive={active} variant="provider"/>}
+  {role==="provider"&&(view==="dashboard"||view==="registration")&&careAccess==="FKRTL"&&fkrtlBenefitMember&&<BenefitCoverage key={fkrtlBenefitMember.cardNo} member={fkrtlBenefitMember} memberActive={isActiveMember(fkrtlBenefitMember)} variant="provider"/>}
   {role==="provider"&&view==="referrals"&&<ProviderReferrals cases={visibleCases} eligibleIds={eligibleReferralIds} selectedId={selectedCaseId} onSelect={id=>{setSelectedCaseId(id);setShowCaseDetail(false)}} onSubmit={submitReferral} onDetail={openCaseDetail} onViewLinked={id=>{const child=cases.find(c=>c.id===id);if(child?.providerCode===activeProvider.code)openCaseDetail(id);else setNotice("Episode FKRTL berada di provider tujuan; status approval dan ID-nya sudah tampil pada rujukan.")}}/>}
   {role==="callcenter"&&view==="referrals"&&<CallCenterReferrals cases={cases} onReview={reviewReferral} onDetail={openCaseDetail} onViewBenefit={id=>{setSelectedCaseId(id||null);setShowCaseDetail(false)}}/>}
   {role==="callcenter"&&view==="referrals"&&referralMember&&selectedCase?.referral&&<BenefitCoverage key={referralMember.cardNo} member={referralMember} memberActive={isActiveMember(referralMember)} variant="callcenter"/>}
