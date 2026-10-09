@@ -2,6 +2,7 @@
 import {useEffect,useMemo,useState} from "react";
 import {Activity,AlertTriangle,ArrowRight,Building2,CheckCircle2,ChevronDown,ChevronLeft,ChevronRight,Clock3,Database,Eye,FileCheck2,FileSpreadsheet,Plus,Search,Settings,ShieldCheck,Stethoscope,Trash2,Upload,UserRound,X} from "lucide-react";
 import SidebarNavigation from "./SidebarNavigation";
+import BenefitCoverage from "./BenefitCoverage";
 
 type Role="provider"|"callcenter";
 type CaseStatus="Waiting Admission"|"Treatment Active"|"Waiting Treatment Approval"|"Treatment Approved"|"Waiting Discharge"|"Closed";
@@ -504,6 +505,15 @@ export default function Page(){
     <div className="admissionBox"><label>Keluhan / Indikasi *<textarea value={complaint} onChange={e=>setComplaint(e.target.value)} placeholder="Jelaskan keluhan utama peserta"/></label><button className="primary" disabled={!canSubmit} onClick={submitAdmission}>Submit Admission <ArrowRight size={17}/></button>{!active&&<small>Coverage peserta sedang tidak aktif berdasarkan periode INCEPTION/EXPIRY atau START/END DATE.</small>}{active&&!faskesMatch&&!urgent&&<small>{faskesMapped?"Submit terkunci karena Faskes 1 tidak sesuai.":"Submit normal terkunci karena Faskes 1 belum dimapping."} Aktifkan Urgent untuk meminta override.</small>}</div>
    </div>}
   </section>}
+  {role==="provider"&&(view==="dashboard"||view==="registration")&&found&&<BenefitCoverage key={found.cardNo} member={found} memberActive={active} variant="provider"/>}
+
+  {role==="callcenter"&&view==="eligibility"&&<section className="card eligibility">
+   <div><h2>Eligibility Review — Call Center</h2><p>Cek status kepesertaan dan 79 item manfaat simulasi. Manfaat sama untuk seluruh peserta Master Peserta pada pilot ini.</p></div>
+   <div className="eligGrid"><label>Card No<input value={cardNo} onChange={e=>setCardNo(e.target.value)} placeholder="CARD-DUMMY-000001"/></label><div/><button type="button" className="primary" onClick={lookup}><Search size={17}/>Cari Peserta</button></div>
+   {lookupDone&&!found&&<div className="result bad"><AlertTriangle/><div><b>Peserta tidak ditemukan</b><span>Periksa CARD NO atau upload Master Peserta terlebih dahulu.</span></div></div>}
+   {found&&<div className="eligResult"><div className="resultTop"><div><span className={"statusDot "+(active?"ok":"no")}>{active?"AKTIF":"TIDAK AKTIF"}</span><h3>{found.name}</h3><p>{found.cardNo} · {found.membershipNo}</p></div></div><div className="detailGrid"><div><span>POLICYNO</span><b>{found.policyNo||"-"}</b></div><div><span>Plan</span><b>{found.planName||"-"}</b></div><div><span>Faskes 1</span><b>{faskesName(found)||"-"} ({faskesCode(found)||"-"})</b></div></div></div>}
+  </section>}
+  {role==="callcenter"&&view==="eligibility"&&found&&<BenefitCoverage key={found.cardNo} member={found} memberActive={active} variant="callcenter"/>}
 
   {role==="provider"&&view==="treatment"&&selectedCase&&<section className="card workflowForm">
    <div className="sectionHead"><div><h2>Treatment Request</h2><p>{selectedCase.id} · {selectedCase.name} · {selectedCase.memberId}</p></div><button className="reviewClear" onClick={()=>{setView("dashboard");setSelectedCaseId(null)}}><X size={15}/> Batal</button></div>
