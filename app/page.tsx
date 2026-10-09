@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useMemo,useState} from "react";
 import {Activity,AlertTriangle,ArrowRight,Building2,CheckCircle2,ChevronDown,ChevronLeft,ChevronRight,Clock3,Database,Eye,FileCheck2,FileSpreadsheet,Plus,Search,Settings,ShieldCheck,Stethoscope,Trash2,Upload,UserRound,X} from "lucide-react";
+import SidebarNavigation from "./SidebarNavigation";
 
 type Role="provider"|"callcenter";
 type CaseStatus="Waiting Admission"|"Treatment Active"|"Waiting Treatment Approval"|"Treatment Approved"|"Waiting Discharge"|"Closed";
@@ -423,25 +424,7 @@ export default function Page(){
  return <div className="shell">
  <aside>
   <div className="brand"><div className="brandLogoFrame"><img src="/pertalife-logo.webp" alt="PertaLife Insurance" className="brandLogo" width="360" height="170"/></div><span className="brandCaption">MANAGED CARE PORTAL</span></div>
-  <nav>
-   <button className={view==="dashboard"?"active":""} onClick={()=>setView("dashboard")}><Activity size={18}/>Dashboard</button>
-   {role==="provider"?<>
-    <button className={view==="profile"?"active":""} onClick={openProviderProfile}><Settings size={18}/>Profile Provider</button>
-    <button className={view==="registration"?"active":""} onClick={()=>{setView("registration");setStatusFilter(null)}}><UserRound size={18}/>Pendaftaran Peserta</button>
-    <button className={view==="treatment"?"active":""} onClick={()=>{setView("treatment");setStatusFilter(null)}}><Stethoscope size={18}/>Treatment Request</button>
-    <button className={view==="discharge"?"active":""} onClick={()=>{setView("discharge");setStatusFilter(null)}}><FileCheck2 size={18}/>Discharge</button>
-    <button className={view==="cases"?"active":""} onClick={()=>{setView("cases");setStatusFilter(null)}}><Activity size={18}/>Case Peserta</button>
-    <button className={view==="history"?"active":""} onClick={()=>setView("history")}><Clock3 size={18}/>Riwayat Discharge</button>
-    <button className={view==="claim"?"active":""} onClick={()=>setView("history")}><FileSpreadsheet size={18}/>Pengajuan Klaim</button>
-   </>:<>
-    <button className={view==="master"?"active":""} onClick={()=>setView("master")}><Database size={18}/>Master Peserta</button>
-    <button className={view==="queue"?"active":""} onClick={()=>{setView("queue");setStatusFilter(null)}}><Clock3 size={18}/>Verification Queue</button>
-    <button className={view==="eligibility"?"active":""} onClick={()=>setView("eligibility")}><ShieldCheck size={18}/>Eligibility Review</button>
-    <button className={view==="history"?"active":""} onClick={()=>setView("history")}><Clock3 size={18}/>Riwayat Discharge</button>
-    <button className={view==="claim"?"active":""} onClick={()=>setView("history")}><FileSpreadsheet size={18}/>Klaim Provider</button>
-    <button className={view==="audit"?"active":""} onClick={()=>setView("audit")}><FileCheck2 size={18}/>Audit Trail</button>
-   </>}
-  </nav>
+  <SidebarNavigation role={role} view={view} onNavigate={(target,resetFilter)=>{setView(target);if(resetFilter)setStatusFilter(null)}} onOpenProviderProfile={openProviderProfile}/>
   <div className="sideFoot"><span>Prototype Mode</span><small>Browser data · No production DB</small></div>
  </aside>
  <main>

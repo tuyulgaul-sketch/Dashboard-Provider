@@ -1,0 +1,64 @@
+
+/* Compact accordion navigation. Existing business logic remains unchanged. */
+.shell > aside nav.navAccordion {display:flex;flex-direction:column;gap:5px}
+.shell > aside nav.navAccordion .navDashboard {display:flex;align-items:center;gap:12px}
+.navGroup {min-width:0;position:relative}
+.shell > aside nav.navAccordion button.navGroupToggle {
+ display:flex;align-items:center;gap:12px;min-height:44px;width:100%;
+ padding:12px 13px;border:1px solid transparent;border-radius:12px;
+ background:transparent;color:rgba(255,255,255,.93);font-size:13px;font-weight:750;
+ transition:background-color .18s ease,border-color .18s ease
+}
+.shell > aside nav.navAccordion button.navGroupToggle:hover {background:rgba(255,255,255,.11);transform:none}
+.shell > aside nav.navAccordion .navGroup.isOpen > button.navGroupToggle,
+.shell > aside nav.navAccordion .navGroup.hasActive > button.navGroupToggle {
+ background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.12)
+}
+.navGroupTitle {flex:1;text-align:left;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.navGroupChevron {flex:0 0 auto;margin-left:auto;transition:transform .18s ease}
+.navGroup.isOpen .navGroupChevron {transform:rotate(180deg)}
+.navGroupItems {display:flex;flex-direction:column;gap:3px;margin:7px 0 10px 18px;padding:1px 0 2px 11px;border-left:1px solid rgba(255,255,255,.30)}
+.shell > aside nav.navAccordion .navGroupItems button {
+ min-height:37px;display:flex;justify-content:flex-start;align-items:center;gap:11px;
+ padding:9px 11px;border-radius:10px;font-size:12px;font-weight:600;
+ color:rgba(255,255,255,.89);background:transparent;white-space:nowrap
+}
+.shell > aside nav.navAccordion .navGroupItems button span {overflow:hidden;text-overflow:ellipsis;text-align:left}
+.shell > aside nav.navAccordion .navGroupItems button svg {width:16px;height:16px;flex-shrink:0}
+.shell > aside nav.navAccordion .navGroupItems button:hover {background:rgba(255,255,255,.12);color:#fff;transform:none}
+.shell > aside nav.navAccordion .navGroupItems button.active {background:#fff;color:var(--pli-blue-deep);font-weight:800;box-shadow:0 3px 12px rgba(20,58,107,.12)}
+.shell > aside nav.navAccordion .navGroupItems button.active:hover {background:#fff;color:var(--pli-blue-deep)}
+@media(min-width:761px) and (max-width:1180px){
+ .shell {grid-template-columns:230px minmax(0,1fr)}
+ .shell > aside {padding:21px 12px}
+ .shell > aside nav.navAccordion button.navGroupToggle,
+ .shell > aside nav.navAccordion .navDashboard,
+ .shell > aside nav.navAccordion .navGroupItems button {font-size:12px;justify-content:flex-start;gap:10px;padding:10px 11px}
+ .shell > aside nav.navAccordion .navDashboard span,
+ .shell > aside nav.navAccordion .navGroupTitle,
+ .shell > aside nav.navAccordion .navGroupItems button span {display:inline}
+ .brandLogoFrame {width:100%;height:auto}
+ .brandLogo {width:100%;height:auto;object-fit:contain}
+ .brandCaption,.sideFoot {display:block}
+}
+@media(max-width:760px){
+ .shell > aside {align-items:center;overflow:visible}
+ .shell > aside nav.navAccordion {display:flex;flex-direction:row;flex-wrap:wrap;justify-content:flex-start;gap:5px;min-width:0;overflow:visible;align-items:center}
+ .shell > aside nav.navAccordion .navDashboard,
+ .shell > aside nav.navAccordion button.navGroupToggle {width:40px;min-width:40px;height:40px;padding:9px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+ .shell > aside nav.navAccordion .navDashboard span,
+ .shell > aside nav.navAccordion .navGroupTitle,
+ .shell > aside nav.navAccordion .navGroupChevron {display:none}
+ .navGroupItems {
+  position:absolute;z-index:80;right:0;top:calc(100% + 9px);
+  min-width:210px;max-width:calc(100vw - 24px);
+  margin:0;padding:7px;border:1px solid #dce8f5;
+  background:#fff;border-radius:14px;box-shadow:0 14px 38px rgba(27,72,125,.20)
+ }
+ .shell > aside nav.navAccordion .navGroupItems button {min-height:39px;color:var(--pli-ink);padding:10px 12px;font-size:12px;justify-content:flex-start;white-space:nowrap}
+ .shell > aside nav.navAccordion .navGroupItems button span {display:inline}
+ .shell > aside nav.navAccordion .navGroupItems button:hover {color:var(--pli-blue-deep);background:var(--pli-blue-tint)}
+ .shell > aside nav.navAccordion .navGroupItems button.active,
+ .shell > aside nav.navAccordion .navGroupItems button.active:hover {color:#fff;background:var(--pli-blue)}
+}
+@media(prefers-reduced-motion:reduce){.navGroupChevron{transition:none}}
