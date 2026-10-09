@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useState} from "react";
-import {Activity,Building2,ChevronDown,Clock3,Database,FileCheck2,FileSpreadsheet,Settings,ShieldCheck,Stethoscope,UserRound} from "lucide-react";
+import {Activity,ArrowRight,Building2,ChevronDown,Clock3,Database,FileCheck2,FileSpreadsheet,Settings,ShieldCheck,Stethoscope,UserRound} from "lucide-react";
 
 type Role="provider"|"callcenter";
 type Item={label:string;view:string;icon:typeof Activity;route?:string;resetFilter?:boolean;profile?:boolean};
@@ -10,6 +10,7 @@ type Props={role:Role;view:string;onNavigate:(view:string,resetFilter?:boolean)=
 const providerGroups:Group[]=[
  {key:"services",label:"Pelayanan Peserta",icon:Stethoscope,items:[
   {label:"Pendaftaran Peserta",view:"registration",icon:UserRound,resetFilter:true},
+  {label:"Pengajuan Rujukan",view:"referrals",icon:ArrowRight},
   {label:"Treatment Request",view:"treatment",icon:Stethoscope,resetFilter:true},
   {label:"Discharge",view:"discharge",icon:FileCheck2,resetFilter:true},
   {label:"Case Peserta",view:"cases",icon:Activity,resetFilter:true}
@@ -25,6 +26,7 @@ const providerGroups:Group[]=[
 const callCenterGroups:Group[]=[
  {key:"verification",label:"Verifikasi Medis",icon:ShieldCheck,items:[
   {label:"Verification Queue",view:"queue",icon:Clock3,resetFilter:true},
+  {label:"Referral Approval",view:"referrals",icon:ArrowRight},
   {label:"Eligibility Review",view:"eligibility",icon:ShieldCheck}
  ]},
  {key:"participants",label:"Data Peserta",icon:Database,items:[
