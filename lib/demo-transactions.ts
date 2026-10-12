@@ -84,7 +84,7 @@ export function makeProviderDemoCases(activeMembers:DemoMember[]):{cases:DemoCas
   if(stage>=5){
    care.dischargeApproval={doctor:"Dokter Simulasi",note:"Verifikasi final simulasi",approvedAt:at+300000};
    history.push(hist(at+300000,"Final Discharge Approved [DUMMY]","Dokter Simulasi","Case ditutup dalam simulasi"));
-   const paid=i%2===0;
+   const paid=i%12===5;
    care.billing={status:paid?"Paid":"Submitted",submittedAt:at+360000,updatedAt:at+420000,reminderCount:0};
    care.claimSubmission={
     receiptDate:new Date(at).toISOString().slice(0,10),product:member.product||"Prokes",
