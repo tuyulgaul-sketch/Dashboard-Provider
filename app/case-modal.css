@@ -1,0 +1,53 @@
+/* Case detail modal for both Provider and Call Center. */
+.caseModalOverlay {
+ position:fixed; inset:0; z-index:10000;
+ display:flex; align-items:center; justify-content:center;
+ padding:clamp(12px,3vw,34px);
+ background:rgba(10,29,52,.60);
+ backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);
+ overscroll-behavior:contain;
+}
+.caseModalDialog {
+ width:min(1180px,100%); min-width:0;
+ max-height:calc(100dvh - 2 * clamp(12px,3vw,34px));
+ overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;
+ margin:0; border-radius:22px;
+ box-shadow:0 24px 95px rgba(5,20,42,.34);
+ scrollbar-gutter:stable;
+ animation:caseModalAppear .16s ease-out both;
+}
+.caseModalDialog>.caseModalHeader {
+ position:sticky;top:0;z-index:3;
+ background:#fff;box-shadow:0 1px 0 #e8eef6;
+ padding:21px 25px;gap:18px;
+}
+.caseModalHeader>div {min-width:0;}
+.caseModalHeader h2 {margin:0;font-size:18px;color:var(--pli-ink,#182d48);overflow-wrap:anywhere;}
+.caseModalHeader p {font-size:12px;color:#6f829b;overflow-wrap:anywhere;}
+.caseModalHeader .caseModalClose {
+ display:inline-flex;align-items:center;justify-content:center;gap:7px;
+ min-width:90px;min-height:39px;flex-shrink:0;
+ border-radius:11px;cursor:pointer;
+}
+.caseModalHeader .caseModalClose:focus-visible {outline:3px solid #80b3e6;outline-offset:3px;}
+.caseModalDialog>.caseDetailGrid {padding:18px 22px 2px;margin-top:0;}
+.caseModalDialog .caseDetailGrid>div {min-width:0;}
+.caseModalDialog .caseDetailGrid b {overflow-wrap:anywhere;}
+.caseModalDialog>.caseEvidence,.caseModalDialog>.caseTimeline {margin:16px 22px 18px;}
+@keyframes caseModalAppear {
+ from {opacity:0;transform:translateY(12px) scale(.992);}
+ to {opacity:1;transform:translateY(0) scale(1);}
+}
+@media(max-width:850px){
+ .caseModalDialog .caseDetailGrid {grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+@media(max-width:560px){
+ .caseModalOverlay {padding:8px;align-items:center;}
+ .caseModalDialog {width:100%;max-height:calc(100dvh - 16px);border-radius:16px;scrollbar-gutter:auto;}
+ .caseModalDialog>.caseModalHeader {padding:15px 14px;align-items:flex-start;}
+ .caseModalHeader h2 {font-size:15px;}
+ .caseModalHeader .caseModalClose {min-width:72px;min-height:34px;font-size:11px;padding:7px;}
+ .caseModalDialog .caseDetailGrid {grid-template-columns:1fr;gap:9px;padding:12px 12px 0;}
+ .caseModalDialog>.caseEvidence,.caseModalDialog>.caseTimeline {margin:12px;}
+}
+@media(prefers-reduced-motion:reduce){.caseModalDialog{animation:none;}}
