@@ -3,6 +3,8 @@ import {useEffect,useMemo,useRef,useState} from "react";
 import {createPortal} from "react-dom";
 import {caseComments,commentReadKey,unreadCaseComments} from "./case-comments";
 import type {CaseComment,CommentKind,ConfirmationStage} from "./case-comments";
+import {CASE_FILE_LIMIT,CASE_FILE_TOTAL_BYTES,downloadCaseFile,fileSizeLabel,saveCaseFiles,validateCaseFiles} from "./case-files";
+import type {CaseFileMeta} from "./case-files";
 import {Activity,AlertTriangle,ArrowRight,Building2,CheckCircle2,ChevronDown,ChevronLeft,ChevronRight,Clock3,Database,Eye,FileCheck2,FileSpreadsheet,MessageSquareText,Plus,Search,Send,Settings,ShieldCheck,Stethoscope,Trash2,Upload,UserRound,X} from "lucide-react";
 import SidebarNavigation from "./SidebarNavigation";
 import BenefitCoverage from "./BenefitCoverage";
@@ -37,6 +39,7 @@ type CareCase={id:string;name:string;memberId:string;company:string;provider:str
  dischargeApproval?:{doctor:string;note:string;approvedAt:number};
  confirmation?:{stage:"Admission"|"Treatment"|"Discharge";reason:string;requestedAt:number;response?:string;respondedAt?:number};
  comments?:CaseComment[];
+ files?:CaseFileMeta[];
  billing?:{status:"Submitted"|"Under Verification"|"Approved"|"Scheduled for Payment"|"Paid";submittedAt:number;updatedAt:number;reminderCount:number;lastReminderAt?:number};
  claimSubmission?:ClaimSubmission;
  demo?:boolean;
@@ -211,9 +214,14 @@ export default function Page(){
  const caseDetailReturnFocusRef=useRef<HTMLElement|null>(null);
  const caseDetailDialogRef=useRef<HTMLElement|null>(null);
  const [commentText,setCommentText]=useState("");
+ const [pendingAdmissionFiles,setPendingAdmissionFiles]=useState<File[]>([]);
+ const [pendingCommentFiles,setPendingCommentFiles]=useState<File[]>([]);
+ const [pendingTreatmentFiles,setPendingTreatmentFiles]=useState<File[]>([]);
+ const [attachmentError,setAttachmentError]=useState("");
+ const [uploadBusy,setUploadBusy]=useState(false);
  const [commentMode,setCommentMode]=useState<CommentKind>("comment");
  const [commentReadAt,setCommentReadAt]=useState<Record<string,number>>({});
- const [treatmentDiagnosis,setTreatmentDiagnosis]=useState(""),[treatmentProcedure,setTreatmentProcedure]=useState(""),[treatmentMedication,setTreatmentMedication]=useState(""),[treatmentCost,setTreatmentCost]=useState(""),[treatmentReason,setTreatmentReason]=useState(""),[treatmentAttachments,setTreatmentAttachments]=useState<string[]>([]);
+ const [treatmentDiagnosis,setTreatmentDiagnosis]=useState(""),[treatmentProcedure,setTreatmentProcedure]=useState(""),[treatmentMedication,setTreatmentMedication]=useState(""),[treatmentCost,setTreatmentCost]=useState(""),[treatmentReason,setTreatmentReason]=useState("");
  const [finalDiagnosis,setFinalDiagnosis]=useState(""),[finalBill,setFinalBill]=useState(""),[dischargeNotes,setDischargeNotes]=useState("");
  const [claimDraft,setClaimDraft]=useState<ClaimSubmission|null>(null),[selectedClaimCases,setSelectedClaimCases]=useState<string[]>([]);
  const [providerProfiles,setProviderProfiles]=useState<Record<string,ProviderProfile>>(defaultProviderProfiles),[profileDraft,setProfileDraft]=useState<ProviderProfile|null>(null),[bankSearch,setBankSearch]=useState(""),[bankOpen,setBankOpen]=useState(false);
@@ -297,6 +305,31 @@ export default function Page(){
  const selectedCase=selectedCaseId?cases.find(c=>c.id===selectedCaseId)||null:null;
  const selectedHistory=selectedCase?(selectedCase.history?.length?selectedCase.history:fallbackHistory(selectedCase)):[];
  const modalComments=selectedCase?caseComments(selectedCase):[];
+ const caseFileList=selectedCase?.files||[];
+ const caseFileBytes=caseFileList.reduce((sum,file)=>sum+file.size,0);
+ function addPendingFiles(stage:"admission"|"comment"|"treatment",files:File[]){
+  if(!files.length)return;
+  const current=stage==="admission"?pendingAdmissionFiles:stage==="comment"?pendingCommentFiles:pendingTreatmentFiles;
+  const existing=stage==="admission"?[]:selectedCase?.files||[];
+  try{
+   validateCaseFiles(existing,current,files);
+   const updated=[...current,...files];
+   if(stage==="admission")setPendingAdmissionFiles(updated);
+   else if(stage==="comment")setPendingCommentFiles(updated);
+   else setPendingTreatmentFiles(updated);
+   setAttachmentError("");
+  }catch(error){setAttachmentError(error instanceof Error?error.message:"Lampiran melampaui batas maksimum.");}
+ }
+ function removePendingFile(stage:"admission"|"comment"|"treatment",index:number){
+  if(stage==="admission")setPendingAdmissionFiles(v=>v.filter((_,i)=>i!==index));
+  else if(stage==="comment")setPendingCommentFiles(v=>v.filter((_,i)=>i!==index));
+  else setPendingTreatmentFiles(v=>v.filter((_,i)=>i!==index));
+  setAttachmentError("");
+ }
+ async function downloadStoredAttachment(file:CaseFileMeta){
+  try{await downloadCaseFile(file);setAttachmentError("");}
+  catch(error){setAttachmentError(error instanceof Error?error.message:"Lampiran gagal diunduh.");}
+ }
  const awaitingProviderResponse=!!selectedCase?.confirmation&&!selectedCase.confirmation.respondedAt;
  const confirmationStage:ConfirmationStage|null=selectedCase?.status==="Waiting Admission"?"Admission":
   selectedCase?.status==="Waiting Treatment Approval"?"Treatment":
@@ -419,11 +452,11 @@ export default function Page(){
   setCases(prev=>prev.filter(c=>!c.demo));setSelectedCaseId(null);setShowCaseDetail(false);
   setSelectedClaimCases([]);setStatusFilter(null);setNotice("Transaksi DUMMY dihapus; master peserta dan transaksi biasa tetap tersimpan.");
  }
- function lookup(){const m=members.find(x=>x.cardNo.toLowerCase()===cardNo.trim().toLowerCase())||null;setFound(m);setLookupDone(true);setUrgent(false);setUrgencyReason("");setUrgencyText("");setComplaint("");}
+ function lookup(){const m=members.find(x=>x.cardNo.toLowerCase()===cardNo.trim().toLowerCase())||null;setFound(m);setLookupDone(true);setUrgent(false);setUrgencyReason("");setUrgencyText("");setComplaint("");setPendingAdmissionFiles([]);setAttachmentError("");}
  function chooseAccess(route:"FKTP"|"FKRTL"|"Emergency"){
   setCareAccess(route);setVisitType(route==="Emergency"?"UGD / IGD":"Rawat Jalan");
   setFound(null);setLookupDone(false);setComplaint("");setUrgent(false);setUrgencyReason("");setUrgencyText("");
-  setShowCaseDetail(false);setSelectedCaseId(null);setFkrtlBenefitCard(null);setNotice("");
+  setShowCaseDetail(false);setSelectedCaseId(null);setFkrtlBenefitCard(null);setNotice("");setPendingAdmissionFiles([]);setAttachmentError("");
  }
  function submitAdmission(){
  if(!found||!canSubmit)return;
@@ -502,7 +535,7 @@ export default function Page(){
   const pending=!!current?.confirmation&&!current.confirmation.respondedAt;
   const waiting=["Waiting Admission","Waiting Treatment Approval","Waiting Discharge"].includes(current?.status||"");
   setCommentMode(role==="provider"?(pending?"reply":"comment"):waiting?"need":"comment");
-  setCommentText("");
+  setCommentText("");setPendingCommentFiles([]);setAttachmentError("");
   setSelectedCaseId(id);setShowCaseDetail(true);
  }
  function openTreatment(id:string){setSelectedCaseId(id);setTreatmentDiagnosis("");setTreatmentProcedure("");setTreatmentMedication("");setTreatmentCost("");setTreatmentReason("");setTreatmentAttachments([]);setView("treatment");setShowCaseDetail(false)}
