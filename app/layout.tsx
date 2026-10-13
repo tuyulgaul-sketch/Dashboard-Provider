@@ -4,5 +4,6 @@ import "./nav-accordion.css";
 import "./benefit-coverage.css";
 import "./referral-flow.css";
 import "./provider-entry.css";
+import "./case-modal.css";
 export const metadata={title:"PertaLife Managed Care Provider Portal",description:"Prototype managed care provider workflow"};
 export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="id"><body>{children}</body></html>}
