@@ -6,7 +6,7 @@ export const CASE_FILE_TOTAL_BYTES=10*1024*1024;
 const DB_NAME="pertalife-case-attachments-v1",STORE="files";
 export type CaseFileMeta={
  id:string;caseId:string;name:string;size:number;type:string;addedAt:number;
- origin:"admission"|"comment"|"treatment";commentId?:string;
+ origin:"admission"|"comment"|"treatment"|"claim";commentId?:string;
 };
 type FileRecord={id:string;blob:Blob};
 export function fileSizeLabel(bytes:number){
