@@ -603,7 +603,7 @@ export default function Page(){
  function inpatientPatient(c:CareCase){
   const m=members.find(x=>x.cardNo.toLowerCase()===c.memberId.toLowerCase());
   return {name:c.name,memberId:c.memberId,company:c.company,provider:c.provider,
-   gender:m?.gender||"",dob:m?.dob||"",planName:c.planName||m?.planName||""};
+   gender:m?.gender||"",dob:m?.dob||"",relation:m?.relation||"",planName:c.planName||m?.planName||""};
  }
  function inpatientHospital(c:CareCase){
   const type=providerProfiles[c.providerCode||""]?.providerType||
