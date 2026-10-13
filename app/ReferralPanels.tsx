@@ -9,10 +9,10 @@ export type ReferralRow={id:string;name:string;memberId:string;provider:string;p
 const HERM="PRV-HERMINA-KMY-001";
 const specialties=["Penyakit Dalam","Anak","Obgyn","Bedah","Ortopedi","Jantung","Mata","THT","Saraf","Kulit & Kelamin","Gigi Spesialis","Lainnya"];
 
-export function ProviderReferrals({cases,eligibleIds,selectedId,onSelect,onSubmit,onDetail,onViewLinked}:{
+export function ProviderReferrals({cases,eligibleIds,selectedId,onSelect,onSubmit,onDetail,onViewLinked,getUnreadCount}:{
  cases:ReferralRow[];eligibleIds:string[];selectedId:string|null;
  onSelect:(id:string|null)=>void;onSubmit:(id:string,draft:ReferralDraft)=>void;
- onDetail:(id:string)=>void;onViewLinked:(id:string)=>void;
+ onDetail:(id:string)=>void;onViewLinked:(id:string)=>void;getUnreadCount?:(id:string)=>number;
 }){
  const selected=cases.find(c=>c.id===selectedId)||null;
  const [refNumber,setRefNumber]=useState("");
@@ -39,7 +39,7 @@ export function ProviderReferrals({cases,eligibleIds,selectedId,onSelect,onSubmi
     <div className="referralRowButtons">
      {eligibleIds.includes(c.id)&&<button className="primary" type="button" onClick={()=>onSelect(c.id)}>{c.referral?.status==="Need Revision"?"Revisi Rujukan":"Buat Rujukan"}</button>}
      {c.referral?.linkedCaseId&&<button type="button" className="reviewClear" onClick={()=>onViewLinked(c.referral!.linkedCaseId!)}>Lihat FKRTL</button>}
-     <button type="button" className="reviewClear" onClick={()=>onDetail(c.id)}>Detail FKTP</button>
+     <button type="button" className="reviewClear" onClick={()=>onDetail(c.id)}>Detail FKTP{(getUnreadCount?.(c.id)||0)>0&&<span className="caseUnreadBadge referralUnreadCount">{getUnreadCount?.(c.id)}</span>}</button>
     </div>
    </div>)}
   </div>
@@ -63,9 +63,9 @@ export function ProviderReferrals({cases,eligibleIds,selectedId,onSelect,onSubmi
  </section>;
 }
 
-export function CallCenterReferrals({cases,onReview,onDetail,onViewBenefit}:{
+export function CallCenterReferrals({cases,onReview,onDetail,onViewBenefit,getUnreadCount}:{
  cases:ReferralRow[];onReview:(id:string,outcome:"Approved"|"Need Revision"|"Rejected")=>void;
- onDetail:(id:string)=>void;onViewBenefit:(id:string)=>void;
+ onDetail:(id:string)=>void;onViewBenefit:(id:string)=>void;getUnreadCount?:(id:string)=>number;
 }){
  const [selectedId,setSelectedId]=useState<string|null>(null);
  const referrals=cases.filter(c=>!!c.referral).sort((a,b)=>(b.referral?.submittedAt||0)-(a.referral?.submittedAt||0));
@@ -74,7 +74,7 @@ export function CallCenterReferrals({cases,onReview,onDetail,onViewBenefit}:{
   <div className="sectionHead"><div><h2>Referral Approval — Call Center</h2><p>Verifikasi dokumen, status kepesertaan, diagnosis, spesialis tujuan, dan benefit sebelum rujukan disetujui. Tidak ada approval Admission FKRTL kedua setelah rujukan Approved.</p></div><span className="countPill">{referrals.filter(c=>c.referral?.status==="Pending Verification").length} pending</span></div>
   <div className="referralList">{referrals.length===0?<p className="referralEmpty">Belum ada rujukan. Rujukan akan tampil setelah FKTP mengirim pengajuan.</p>:referrals.map(c=><div className="referralRow" key={c.id}>
    <div><strong>{c.name}</strong><small>{c.id} · {c.memberId} · {c.provider}</small><small>{c.referral?.kind} · {c.referral?.specialty} · <b>{c.referral?.status}</b></small></div>
-   <div className="referralRowButtons"><button className="reviewClear" onClick={()=>{setSelectedId(prev=>prev===c.id?null:c.id);onViewBenefit(c.id)}}><Search size={14}/>Review Rujukan</button><button className="reviewClear" onClick={()=>onDetail(c.id)}>Detail Case</button></div>
+   <div className="referralRowButtons"><button className="reviewClear" onClick={()=>{setSelectedId(prev=>prev===c.id?null:c.id);onViewBenefit(c.id)}}><Search size={14}/>Review Rujukan</button><button className="reviewClear" onClick={()=>onDetail(c.id)}>Detail Case{(getUnreadCount?.(c.id)||0)>0&&<span className="caseUnreadBadge referralUnreadCount">{getUnreadCount?.(c.id)}</span>}</button></div>
   </div>)}</div>
   {selected&&selected.referral&&<div className="referralReview">
    <div className="reviewHead"><div><b>Verifikasi Rujukan · {selected.referral.id}</b><span>{selected.name} · {selected.referral.status}</span></div><button className="reviewClear" onClick={()=>{setSelectedId(null);onViewBenefit("")}}>Tutup</button></div>
