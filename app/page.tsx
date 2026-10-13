@@ -648,34 +648,70 @@ export default function Page(){
  function openClaimBundle(ids:string[]){
   const eligible=cases.filter(c=>ids.includes(c.id)&&c.status==="Closed"&&c.dischargeRequest&&!c.billing);
   if(!eligible.length){setNotice("Pilih minimal satu discharge approved yang belum diajukan klaim.");return}
-  const first=eligible[0],m=members.find(x=>x.cardNo===first.memberId),profile=providerProfiles[first.providerCode||activeProvider.code]||defaultProviderProfiles[first.providerCode||activeProvider.code]||activeProviderProfile;
+  const first=eligible[0],m=members.find(x=>x.cardNo===first.memberId);
+  // One submission belongs to exactly one provider for correct payment ownership.
+  if(eligible.some(c=>(c.providerCode||c.provider)!==(first.providerCode||first.provider))){
+   setNotice("Bundle hanya boleh berisi case dari Provider yang sama.");return;
+  }
+  const profile=providerProfiles[first.providerCode||activeProvider.code]||defaultProviderProfiles[first.providerCode||activeProvider.code]||activeProviderProfile;
   const bundleId="BCL-"+new Date().toISOString().slice(2,10).replaceAll("-","")+"-"+String(Date.now()).slice(-5);
   const total=eligible.reduce((sum,x)=>sum+(x.dischargeRequest?.finalBill||0),0);
   setClaimDraft({
-   receiptDate:new Date().toISOString().slice(0,10),product:m?.product||"Prokes",claimType:"Bundle Provider",reimbursementType:"",
-   bankName:profile?.bankName||"",applicantName:first.provider,participantName:eligible.length+" peserta",participantNo:"MULTI-CASE",
-   phone:profile?.phone||"",email:profile?.email||"",description:"Bundle klaim "+first.provider+" ("+eligible.length+" case)",paymentMethod:profile?.paymentMethod||"Transfer",
-   accountNo:profile?.accountNo||"",accountName:profile?.accountName||"",applicationStatus:"Diajukan",submittedBy:profile?.contactPerson||first.provider,receivedBy:"",claimProkes:true,submittedAt:0,
+   receiptDate:new Date().toISOString().slice(0,10),product:m?.product||"Prokes",
+   claimType:claimTypeSummary(eligible),reimbursementType:"",
+   bankName:profile?.bankName||"",applicantName:first.provider,participantName:eligible.length+" peserta",
+   participantNo:eligible.length===1?first.memberId:"MULTI-CASE",
+   phone:profile?.phone||"",email:profile?.email||"",
+   description:"Bundle klaim "+first.provider+" ("+eligible.length+" case)",paymentMethod:"Transfer",
+   accountNo:profile?.accountNo||"",accountName:profile?.accountName||"",
+   applicationStatus:"Diajukan",submittedBy:profile?.contactPerson||first.provider,
+   receivedBy:"",claimProkes:true,submittedAt:0,files:[],
    documents:claimDocumentLabels.map(label=>({label,submitted:false,cs:false,cl:false,fa:false,remark:""})),
    bundleId,bundleCaseIds:eligible.map(x=>x.id),bundleTotalBill:total
   });
+  setPendingClaimFiles([]);setClaimFileError("");
   setSelectedCaseId(first.id);setView("claim");setShowCaseDetail(false);
  }
  function openClaimSubmission(id:string){
   const c=cases.find(x=>x.id===id);if(!c||!c.dischargeRequest)return;
-  if(c.claimSubmission){setClaimDraft(c.claimSubmission);setSelectedCaseId(id);setView("claim");return}
+  if(c.claimSubmission){
+   const submissionId=c.claimSubmission.bundleId||"CLAIM-"+c.id;
+   setClaimDraft(null);setSelectedCaseId(null);setExpandedClaimId(submissionId);setView("claim-list");return;
+  }
   openClaimBundle([id]);
  }
- function submitClaim(){
-  if(!selectedCase||!claimDraft)return;
+ function addClaimFiles(files:File[]){
+  if(!files.length||!claimDraft)return;
+  try{validateClaimFiles(claimDraft.files||[],pendingClaimFiles,files);setPendingClaimFiles(v=>[...v,...files]);setClaimFileError("");}
+  catch(error){setClaimFileError(error instanceof Error?error.message:"Ukuran dokumen klaim melampaui batas.");}
+ }
+ async function submitClaim(){
+  if(!selectedCase||!claimDraft||uploadBusy)return;
   if(!claimDraft.bankName.trim()||!claimDraft.accountNo.trim()||!claimDraft.accountName.trim()){
    setNotice("Nama Bank, No. Rekening, dan Atas Nama wajib diisi sebelum submit klaim.");return;
   }
-  const submittedAt=Date.now();
   const bundleIds=claimDraft.bundleCaseIds?.length?claimDraft.bundleCaseIds:[selectedCase.id];
-  setCases(v=>v.map(c=>bundleIds.includes(c.id)?withHistory({...c,claimSubmission:{...claimDraft,applicationStatus:"Diterima",submittedAt},billing:{status:"Submitted",submittedAt,updatedAt:submittedAt,reminderCount:0}},"Claim Submitted",c.provider,(claimDraft.bundleId||c.id)+" · "+formatRupiah(c.dischargeRequest?.finalBill||0),submittedAt):c));
-  setNotice("Bundle klaim "+(claimDraft.bundleId||"")+" berhasil dikirim ke PertaLife ("+bundleIds.length+" case).");
-  setClaimDraft(null);setSelectedCaseId(null);setSelectedClaimCases([]);setView("history");
+  const eligible=cases.filter(c=>bundleIds.includes(c.id)&&c.status==="Closed"&&!c.billing&&!!c.dischargeRequest);
+  if(eligible.length!==bundleIds.length){
+   setClaimFileError("Sebagian case sudah diajukan atau tidak lagi eligible. Buka kembali pengajuan dari Riwayat Discharge.");return;
+  }
+  const claimId=claimDraft.bundleId||"CLAIM-"+selectedCase.id;
+  setUploadBusy(true);setClaimFileError("");
+  try{
+   validateClaimFiles(claimDraft.files||[],pendingClaimFiles);
+   const files=await saveCaseFiles(claimId,pendingClaimFiles,"claim");
+   const submittedAt=Date.now();
+   const draft:ClaimSubmission={...claimDraft,paymentMethod:"Transfer",claimType:claimTypeSummary(eligible),
+    files:[...(claimDraft.files||[]),...files],applicationStatus:"Diterima",submittedAt};
+   setCases(v=>v.map(c=>bundleIds.includes(c.id)?withHistory({...c,
+    claimSubmission:{...draft,claimType:claimTypeFromAdmission(c)},
+    billing:{status:"Submitted",submittedAt,updatedAt:submittedAt,reminderCount:0}},
+    "Claim Submitted",c.provider,claimId+" · "+formatRupiah(c.dischargeRequest?.finalBill||0),submittedAt):c));
+   setNotice("Pengajuan "+claimId+" diterima ("+bundleIds.length+" case). Dokumen klaim tersimpan di browser ini.");
+   setClaimDraft(null);setPendingClaimFiles([]);setSelectedCaseId(null);setSelectedClaimCases([]);
+   setExpandedClaimId(claimId);setView("claim-list");
+  }catch(error){setClaimFileError(error instanceof Error?error.message:"Dokumen gagal disimpan. Pengajuan belum dikirim.");}
+  finally{setUploadBusy(false);}
  }
  function updateClaimDocument(caseId:string,index:number,patch:Partial<ClaimDocument>){
   setCases(v=>v.map(c=>c.id===caseId&&c.claimSubmission?{...c,claimSubmission:{...c.claimSubmission,documents:c.claimSubmission.documents.map((d,i)=>i===index?{...d,...patch}:d)}}:c));
@@ -691,14 +727,33 @@ export default function Page(){
   const at=Date.now();setCases(v=>v.map(c=>c.id===id&&c.billing?withHistory({...c,billing:{...c.billing,status,updatedAt:at}},"Payment Status Updated","PertaLife",status,at):c));
  }
  function approveMedical(id:string,stage:"Treatment"|"Discharge"){
-  const doctor=window.prompt("Nama dokter PertaLife yang memberikan approval:");
-  if(!doctor||!doctor.trim())return;
-  const note=window.prompt("Catatan approval / pertimbangan medis:");
-  if(note===null||!note.trim())return;
-  const at=Date.now();
-  setCases(v=>v.map(c=>c.id===id?stage==="Treatment"?withHistory({...c,status:"Treatment Approved",treatmentApproval:{doctor:doctor.trim(),note:note.trim(),approvedAt:at},confirmation:undefined,submittedAt:at},"Treatment Approved","dr. "+doctor.trim()+" / PertaLife",note.trim(),at):withHistory({...c,status:"Closed",dischargeApproval:{doctor:doctor.trim(),note:note.trim(),approvedAt:at},confirmation:undefined,submittedAt:at},"Final Discharge Approved","dr. "+doctor.trim()+" / PertaLife",note.trim(),at):c));
-  setNotice((stage==="Treatment"?"Treatment":"Final discharge")+" disetujui oleh dr. "+doctor.trim()+".");
+  const current=cases.find(c=>c.id===id);
+  if(role!=="callcenter"||!current||current.status!==(stage==="Treatment"?"Waiting Treatment Approval":"Waiting Discharge"))return;
+  setMedicalModal({caseId:id,stage});setMedicalDoctor("");setMedicalNote("");setShowCaseDetail(false);
  }
+ function submitMedicalApproval(){
+  if(!medicalModal||!medicalDoctor.trim()||!medicalNote.trim()||role!=="callcenter")return;
+  const {caseId,stage}=medicalModal;
+  const expected=stage==="Treatment"?"Waiting Treatment Approval":"Waiting Discharge";
+  if(cases.find(c=>c.id===caseId)?.status!==expected){
+   setNotice("Status case telah berubah. Silakan muat ulang antrean approval.");setMedicalModal(null);return;
+  }
+  const at=Date.now(),doctor=medicalDoctor.trim(),note=medicalNote.trim();
+  setCases(v=>v.map(c=>c.id===caseId?stage==="Treatment"?
+   withHistory({...c,status:"Treatment Approved",treatmentApproval:{doctor,note,approvedAt:at},confirmation:undefined,submittedAt:at},
+    "Treatment Approved","dr. "+doctor+" / PertaLife",note,at):
+   withHistory({...c,status:"Closed",dischargeApproval:{doctor,note,approvedAt:at},confirmation:undefined,submittedAt:at},
+    "Final Discharge Approved","dr. "+doctor+" / PertaLife",note,at):c));
+  setNotice((stage==="Treatment"?"Treatment":"Final discharge")+" disetujui oleh dr. "+doctor+".");
+  setMedicalModal(null);setMedicalDoctor("");setMedicalNote("");
+ }
+ useEffect(()=>{
+  if(!medicalModal)return;
+  const old=document.body.style.overflow;document.body.style.overflow="hidden";
+  const onKey=(e:KeyboardEvent)=>{if(e.key==="Escape")setMedicalModal(null);};
+  window.addEventListener("keydown",onKey);
+  return()=>{document.body.style.overflow=old;window.removeEventListener("keydown",onKey);};
+ },[medicalModal]);
  const decide=(id:string,status:CaseStatus)=>{const at=Date.now();setCases(v=>v.map(c=>c.id===id?withHistory({...c,status,confirmation:undefined,submittedAt:at},status==="Treatment Active"?"Admission Approved":"Status Updated","Call Center PertaLife",status,at):c));};
 
  return <div className="shell">
