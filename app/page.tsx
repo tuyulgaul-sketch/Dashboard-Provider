@@ -649,8 +649,8 @@ export default function Page(){
    </div>}
    </>}
   </section>}
-  {role==="provider"&&(view==="dashboard"||view==="registration")&&found&&careAccess!=="FKRTL"&&<BenefitCoverage key={found.cardNo} member={found} memberActive={active} variant="provider"/>}
-  {role==="provider"&&(view==="dashboard"||view==="registration")&&careAccess==="FKRTL"&&fkrtlBenefitMember&&<BenefitCoverage key={fkrtlBenefitMember.cardNo} member={fkrtlBenefitMember} memberActive={isActiveMember(fkrtlBenefitMember)} variant="provider"/>}
+  {role==="provider"&&(view==="dashboard"||view==="registration")&&found&&careAccess!=="FKRTL"&&<BenefitCoverage key={found.cardNo} member={found} memberActive={active} variant="provider" serviceContext={careAccess}/>}
+  {role==="provider"&&(view==="dashboard"||view==="registration")&&careAccess==="FKRTL"&&fkrtlBenefitMember&&<BenefitCoverage key={fkrtlBenefitMember.cardNo} member={fkrtlBenefitMember} memberActive={isActiveMember(fkrtlBenefitMember)} variant="provider" serviceContext="FKRTL"/>}
   {role==="provider"&&view==="referrals"&&<ProviderReferrals cases={visibleCases} eligibleIds={eligibleReferralIds} selectedId={selectedCaseId} onSelect={id=>{setSelectedCaseId(id);setShowCaseDetail(false)}} onSubmit={submitReferral} onDetail={openCaseDetail} onViewLinked={id=>{const child=cases.find(c=>c.id===id);if(child?.providerCode===activeProvider.code)openCaseDetail(id);else setNotice("Episode FKRTL berada di provider tujuan; status approval dan ID-nya sudah tampil pada rujukan.")}}/>}
   {role==="callcenter"&&view==="referrals"&&<CallCenterReferrals cases={cases} onReview={reviewReferral} onDetail={openCaseDetail} onViewBenefit={id=>{setSelectedCaseId(id||null);setShowCaseDetail(false)}}/>}
   {role==="callcenter"&&view==="referrals"&&referralMember&&selectedCase?.referral&&<BenefitCoverage key={referralMember.cardNo} member={referralMember} memberActive={isActiveMember(referralMember)} variant="callcenter"/>}
