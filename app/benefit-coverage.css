@@ -1,0 +1,75 @@
+
+/* Pilot benefit viewer: PertaLife palette, non-invasive to existing workflow. */
+.benefitsSection { margin:0 0 18px; overflow:hidden; border-color:#e0eaf5; }
+.benefitsHeading {display:flex;align-items:center;gap:13px;padding:20px 23px;border-bottom:1px solid #e7edf4;}
+.benefitsHeaderIcon {display:grid;place-items:center;width:43px;height:43px;border-radius:13px;color:var(--pli-blue);background:#eaf3fb;flex-shrink:0;}
+.benefitsHeaderText {flex:1;min-width:0;}
+.benefitsHeadingLine {display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.benefitsHeading h2 {margin:0;color:var(--pli-ink);font-size:17px;letter-spacing:-.02em;}
+.benefitsHeading p {margin:6px 0 0;color:var(--pli-muted);font-size:12px;line-height:1.55;}
+.benefitDemoBadge {font-weight:800;font-size:9px;letter-spacing:.05em;color:#a52c39;background:#fff0f1;border:1px solid #f6d7db;border-radius:999px;padding:5px 8px;}
+.benefitCollapse {background:#fff;border:1px solid #cfe1f2;color:var(--pli-blue-deep);border-radius:10px;padding:10px 13px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;}
+.benefitCollapse:hover {background:#f3f8ff;}
+.benefitIdentity {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:17px 22px;}
+.benefitIdentity>div {min-width:0;border:1px solid #e7eef6;background:#fbfdff;border-radius:12px;padding:12px 13px;}
+.benefitIdentity small,.benefitIdentity strong,.benefitIdentity span {display:block;overflow-wrap:anywhere;}
+.benefitIdentity small {font-size:9px;letter-spacing:.035em;color:#77869c;font-weight:800;}
+.benefitIdentity strong {margin-top:7px;font-size:12px;font-weight:800;color:var(--pli-ink);}
+.benefitIdentity span {margin-top:4px;font-size:10px;color:var(--pli-muted);}
+.benefitIdentity .benefitStatusOn {color:#58721f;}
+.benefitIdentity .benefitStatusOff {color:#b22e40;}
+.benefitSummaryGrid {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin:0 22px 16px;}
+.benefitSummaryGrid button {display:flex;flex-direction:column;align-items:flex-start;min-width:0;padding:15px;border:1px solid #e4edf7;background:#fff;border-radius:13px;text-align:left;cursor:pointer;transition:box-shadow .16s ease,border-color .16s ease,transform .16s ease;}
+.benefitSummaryGrid button:hover {transform:translateY(-1px);border-color:#bdd7f1;box-shadow:0 5px 17px rgba(40,86,130,.08);}
+.benefitSummaryGrid button.isSelected {background:#f2f8fd;border-color:#7baad8;box-shadow:0 0 0 2px rgba(55,111,176,.08);}
+.benefitSummaryGrid span {font-weight:750;font-size:11px;color:#728198;}
+.benefitSummaryGrid strong {margin:5px 0;font-size:25px;color:var(--pli-blue-deep);}
+.benefitSummaryGrid small {font-size:10px;color:#7c8ba0;}
+.benefitExplainer {margin:0 22px 17px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;background:#f5f8e9;color:#586b26;border:1px solid #e0e9c1;border-radius:12px;}
+.benefitExplainer svg {margin-top:2px;flex-shrink:0;}
+.benefitExplainer p {margin:0;font-size:11px;line-height:1.75;}
+.benefitTools {padding:0 22px 14px;display:flex;gap:10px;align-items:end;flex-wrap:wrap;}
+.benefitSearch {display:flex;align-items:center;gap:8px;flex:1;min-width:220px;padding:0 12px;border:1px solid #dce6f1;border-radius:10px;background:#fff;}
+.benefitSearch svg {color:var(--pli-blue);}
+.benefitSearch input {border:none;outline:none!important;box-shadow:none!important;margin:0;padding:11px 0;min-width:0;font-size:12px;background:transparent;}
+.benefitSearch:focus-within {border-color:#8fb6df;box-shadow:0 0 0 3px rgba(55,111,176,.09);}
+.benefitSelect {display:flex;flex-direction:column;min-width:200px;}
+.benefitSelect span {font-size:10px;margin-bottom:5px;color:#6c7a92;}
+.benefitSelect select {margin:0;padding:10px;font-size:11px;height:40px;max-width:290px;}
+.benefitReset {height:40px;padding:0 13px;background:#fff;color:var(--pli-blue-deep);border:1px solid #d4e4f4;border-radius:10px;font-size:11px;font-weight:800;cursor:pointer;}
+.benefitReset:hover {background:#eff6fc;}
+.benefitTableWrap {width:100%;max-height:500px;overflow:auto;}
+.benefitTable {min-width:1080px;width:100%;}
+.benefitTable th {background:#f2f7fc;position:sticky;top:0;z-index:1;}
+.benefitTable td {vertical-align:top;font-size:11px;line-height:1.5;}
+.benefitTable th:first-child,.benefitTable td:first-child {width:50px;text-align:center;}
+.benefitTable th:nth-child(2),.benefitTable td:nth-child(2) {min-width:230px;max-width:300px;}
+.benefitTable th:nth-child(3),.benefitTable td:nth-child(3) {min-width:220px;max-width:340px;}
+.benefitTable th:nth-child(4),.benefitTable td:nth-child(4),.benefitTable th:nth-child(5),.benefitTable td:nth-child(5),.benefitTable th:nth-child(6),.benefitTable td:nth-child(6) {white-space:nowrap;}
+.benefitTable td strong,.benefitTable td small {display:block;}
+.benefitTable td small {margin-top:4px;color:#8290a2;font-size:10px;}
+.benefitScope {display:inline-block;margin-top:6px;padding:4px 6px;font-weight:850;color:#b22e40;font-size:9px;letter-spacing:.02em;border-radius:6px;background:#fff1f2;}
+.benefitAsCharged {display:inline-block;background:#eef6ff;border:1px solid #dcebf8;color:#2d5e9b;border-radius:20px;padding:5px 8px;font-weight:800;font-size:10px;}
+.benefitMuted {color:#94a0b1;font-style:italic;font-size:10px;}
+.benefitRemaining {color:#5a7423!important;}
+.benefitExhausted {color:#b33444;font-size:10px;font-weight:800;}
+.benefitEmpty {padding:33px!important;text-align:center;color:#647a92;}
+.benefitFoot {display:flex;align-items:flex-start;gap:10px;padding:14px 22px 19px;border-top:1px solid #ebf0f6;background:#f9fbfe;color:var(--pli-blue);}
+.benefitFoot>div {flex:1;}
+.benefitFoot strong,.benefitFoot span {display:block;}
+.benefitFoot strong {font-size:11px;color:var(--pli-ink);}
+.benefitFoot span {margin-top:5px;line-height:1.6;font-size:10px;color:#6b7f95;}
+@media(max-width:1100px){
+.benefitIdentity,.benefitSummaryGrid {grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+@media(max-width:620px){
+.benefitsHeading {padding:15px;gap:8px;flex-wrap:wrap;}
+.benefitsHeaderIcon {width:35px;height:35px;}
+.benefitIdentity,.benefitSummaryGrid {margin-left:15px;margin-right:15px;}
+.benefitExplainer {margin-left:15px;margin-right:15px;}
+.benefitTools {padding:0 15px 12px;}
+.benefitSearch,.benefitSelect {flex-basis:100%;min-width:0;}
+.benefitSelect select {width:100%;max-width:none;}
+.benefitFoot {padding:13px 15px;}
+}
+@media(max-width:380px){.benefitIdentity,.benefitSummaryGrid {grid-template-columns:1fr 1fr;}.benefitSummaryGrid button {padding:10px;}.benefitSummaryGrid strong {font-size:22px;}}

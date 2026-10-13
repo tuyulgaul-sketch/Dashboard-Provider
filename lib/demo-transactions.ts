@@ -1,3 +1,4 @@
+import type {ReferralRequest} from "../app/ReferralPanels";
 
 type DemoMember={cardNo:string;name:string;company:string;policyNo:string;planName:string;product:string;faskes1Code:string};
 type DemoStatus="Waiting Admission"|"Treatment Active"|"Waiting Treatment Approval"|"Treatment Approved"|"Waiting Discharge"|"Closed";
@@ -5,7 +6,7 @@ type DemoHistory={at:number;actor:string;event:string;detail?:string};
 export type DemoCase={
  id:string;name:string;memberId:string;company:string;provider:string;providerCode:string;status:DemoStatus;urgent:boolean;submittedAt:number;
  issue:string;visitType:string;careLevel:"FKTP"|"FKRTL";accessRoute:"FKTP"|"Emergency"|"Referral";policyNo:string;planName:string;demo:true;
- urgencyReason?:string;parentCaseId?:string;originReferralId?:string;specialty?:string;
+ urgencyReason?:string;parentCaseId?:string;originReferralId?:string;specialty?:string;referral?:ReferralRequest;
  treatmentRequest?:{diagnosis:string;procedure:string;medication:string;reason:string;estimatedCost:number;submittedAt:number};
  treatmentApproval?:{doctor:string;note:string;approvedAt:number};
  dischargeRequest?:{finalDiagnosis:string;finalBill:number;notes:string;submittedAt:number};
@@ -96,6 +97,33 @@ export function makeProviderDemoCases(activeMembers:DemoMember[]):{cases:DemoCas
    };
    history.push(hist(at+360000,"Claim Submitted [DUMMY]",provider.name,"Klaim simulasi"));
    if(paid)history.push(hist(at+420000,"Payment Status: Paid [DUMMY]","Call Center Simulasi","Bukan transfer riil"));
+  }
+  if(!emergency&&status==="Treatment Active"&&referrals<2){
+   const approved=referrals===1,refAt=at+180000;
+   const refId="SIM-RF-"+batch+"-"+(i+1),childId="SIM-FKRTL-"+batch+"-"+(i+1);
+   const referral:ReferralRequest={
+    id:refId,refNumber:"RUJ/SIM/"+(i+1)+"/"+batch,
+    specialty:approved?"THT":"Penyakit Dalam",doctor:"dr. Simulasi FKTP",
+    diagnosis,reason:"Pemeriksaan spesialis (simulasi)",documentReference:"DOK-SIM-"+batch+"-"+(i+1),
+    kind:provider.code==="PRV-HERMINA-KMY-001"?"Internal (Satu Atap)":"Eksternal",
+    sourceCaseId:id,sourceProviderCode:provider.code,targetProviderCode:providers[0].code,targetProviderName:providers[0].name,
+    status:approved?"Approved":"Pending Verification",submittedAt:refAt,
+    ...(approved?{reviewedAt:refAt+60000,reviewer:"Verifier Demo Call Center",
+     reviewNote:"Rujukan diverifikasi dalam simulasi",linkedCaseId:childId}:{})
+   };
+   care.referral=referral;
+   history.push(hist(refAt,"Referral Submitted [DUMMY]",provider.name,referral.kind));
+   if(approved){
+    history.push(hist(refAt+60000,"Referral Approved [DUMMY]","Verifier Demo Call Center","FKRTL otomatis"));
+    cases.push({id:childId,name:member.name,memberId:member.cardNo,company:member.company,
+     provider:providers[0].name,providerCode:providers[0].code,status:"Treatment Active",urgent:false,
+     submittedAt:refAt+60000,issue:"Rujukan spesialis: "+diagnosis,visitType:"Rawat Jalan Spesialis",
+     careLevel:"FKRTL",accessRoute:"Referral",parentCaseId:id,originReferralId:refId,
+     specialty:referral.specialty,policyNo:member.policyNo,planName:member.planName,demo:true,
+     history:[hist(refAt+60000,"Referral Approved / Admission FKRTL Automatic [DUMMY]","Verifier Demo Call Center",
+       provider.name+" → "+providers[0].name)]});
+   }
+   referrals++;
   }
   cases.push(care);
  });

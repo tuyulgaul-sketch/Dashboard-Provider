@@ -1,0 +1,54 @@
+
+/* Provider-friendly arrival paths (FKTP, approved FKRTL referral, emergency). */
+.entryPathIntro {margin-top:19px;}
+.entryStepTag {display:inline-block;color:#4e79aa;background:#ecf5fd;border:1px solid #d7e9fa;font-size:10px;font-weight:850;letter-spacing:.045em;padding:5px 9px;border-radius:999px;}
+.entryPathIntro h3 {margin:10px 0 4px;font-size:15px;font-weight:800;color:var(--pli-ink);}
+.entryPathIntro p {margin:0;color:var(--pli-muted);font-size:12px;line-height:1.6;}
+.entryPathCards {display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:12px;margin:15px 0 19px;}
+.entryPathCard {
+ position:relative;display:flex;align-items:flex-start;gap:12px;text-align:left;cursor:pointer;
+ padding:16px 14px;min-width:0;min-height:153px;background:#fff;
+ border:1px solid #dde8f4;border-radius:15px;box-shadow:0 2px 8px rgba(48,87,134,.025);
+ transition:transform .16s ease,background-color .16s ease,border-color .16s ease,box-shadow .16s ease;
+}
+.entryPathCard:hover {transform:translateY(-2px);border-color:#adcce8;box-shadow:0 8px 20px rgba(48,87,134,.07);}
+.entryPathCard.selected {background:#f4f9fe;border:2px solid var(--pli-blue);padding:15px 13px;box-shadow:0 0 0 3px rgba(55,111,176,.08);}
+.entryPathCard .entryPathIcon {flex:0 0 40px;width:40px;height:40px;display:grid;place-items:center;border-radius:12px;background:#e9f3fd;color:var(--pli-blue);}
+.entryPathCard .entryPathText {display:flex;flex-direction:column;gap:6px;min-width:0;flex:1;padding-right:9px;}
+.entryPathText strong {color:var(--pli-ink);font-size:12px;line-height:1.35;font-weight:850;}
+.entryPathText small {font-size:10.5px;line-height:1.55;color:#6b7c94;}
+.entryPathText em {margin-top:auto;padding-top:5px;color:#3d6c9a;font-size:10px;line-height:1.4;font-style:normal;font-weight:800;}
+.entryPathCard .entryPathCheck {position:absolute;top:12px;right:10px;color:#c5d3e2;opacity:.6;}
+.entryPathCard.selected .entryPathCheck {color:var(--pli-blue);opacity:1;}
+.entryPathCard.emergency .entryPathIcon {background:#fff1f3;color:#be3b4c;}
+.entryPathCard.emergency.selected {border-color:#be4959;background:#fff9fa;box-shadow:0 0 0 3px rgba(199,57,78,.07);}
+.entryPathCard.emergency.selected .entryPathCheck,.entryPathCard.emergency .entryPathText em {color:#b64250;}
+.entryPathCard:focus-visible {outline:3px solid rgba(55,111,176,.23);outline-offset:3px;}
+.entryPathInstruction {display:flex;align-items:flex-start;gap:12px;margin-top:19px;margin-bottom:16px;flex-wrap:wrap;}
+.entryPathInstruction .accessModeNote {flex:1 1 100%;border-radius:12px;}
+.entryPathInstruction .entryStepTag {margin-bottom:0;}
+.entryPathInstruction + .eligGrid {margin-top:14px;}
+.referralEntry {margin-top:8px;border:1px solid #dce8f5;border-radius:15px;overflow:hidden;background:#fbfdff;}
+.referralEntryIntro {display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:17px 18px 10px;}
+.referralEntryIntro h3 {font-size:15px;margin:10px 0 4px;color:var(--pli-ink);}
+.referralEntryIntro p {font-size:11.5px;line-height:1.65;color:#6c7f98;margin:0;}
+.referralEntryIntro p b {color:#355d8e;}
+.referralEntrySearch {display:flex;align-items:center;gap:8px;margin:11px 18px 15px;padding:0 12px;border:1px solid #d7e5f3;border-radius:11px;background:#fff;color:var(--pli-blue);}
+.referralEntrySearch input {flex:1;width:100%;min-width:0;margin:0;border:0;background:transparent;padding:11px 0;box-shadow:none;outline:none;font-size:12px;}
+.referralEntrySearch:focus-within {border-color:#7eaad5;box-shadow:0 0 0 3px rgba(55,111,176,.10);}
+.referralEntryEmpty {display:flex;align-items:flex-start;gap:12px;margin:0 18px 16px;padding:17px 15px;border:1px dashed #bfd5ec;border-radius:12px;background:#f2f8fe;color:#386798;}
+.referralEntryEmpty strong {display:block;color:#2c507d;font-size:12px;}
+.referralEntryEmpty p {margin:6px 0 0;font-size:11px;line-height:1.6;color:#617994;}
+.referralEntryEmpty svg {flex:0 0 auto;}
+.referralEntryList {padding:0 18px 13px;max-height:390px;overflow:auto;}
+.referralEntryRow {display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid #e5edf6;}
+.referralEntryRow:last-child {border-bottom:0;}
+.referralEntryRow>div:first-child {min-width:0;flex:1;}
+.referralEntryRow strong {display:block;color:var(--pli-ink);font-size:12px;}
+.referralEntryRow small {display:block;margin-top:4px;font-size:10px;line-height:1.55;color:#74859c;}
+.referralEntryActions {display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap;}
+.referralEntryActions button {display:flex;align-items:center;justify-content:center;gap:6px;min-height:35px;white-space:nowrap;}
+.referralEntryNotice {display:flex;gap:9px;align-items:flex-start;padding:14px 17px;border-top:1px solid #e2ebf6;background:#edf5fc;color:#3e6893;font-size:11px;line-height:1.6;}
+.referralEntryNotice svg {flex:0 0 auto;margin-top:1px;}
+@media(max-width:1200px){.entryPathCards {grid-template-columns:repeat(auto-fit,minmax(218px,1fr));}.entryPathCard {min-height:146px;}}
+@media(max-width:770px){.entryPathCards {grid-template-columns:1fr;gap:9px;}.entryPathCard {min-height:98px;padding:13px;}.entryPathCard.selected {padding:12px;}.referralEntryRow {align-items:flex-start;flex-direction:column;}.referralEntryActions {justify-content:flex-start;}.referralEntryIntro {flex-direction:column;}.referralEntrySearch {margin-left:13px;margin-right:13px;}.referralEntryList {padding-left:13px;padding-right:13px;}}
