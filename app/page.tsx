@@ -498,6 +498,11 @@ export default function Page(){
  function openCaseDetail(id:string){
   const focused=document.activeElement;
   caseDetailReturnFocusRef.current=focused instanceof HTMLElement?focused:null;
+  const current=cases.find(c=>c.id===id);
+  const pending=!!current?.confirmation&&!current.confirmation.respondedAt;
+  const waiting=["Waiting Admission","Waiting Treatment Approval","Waiting Discharge"].includes(current?.status||"");
+  setCommentMode(role==="provider"?(pending?"reply":"comment"):waiting?"need":"comment");
+  setCommentText("");
   setSelectedCaseId(id);setShowCaseDetail(true);
  }
  function openTreatment(id:string){setSelectedCaseId(id);setTreatmentDiagnosis("");setTreatmentProcedure("");setTreatmentMedication("");setTreatmentCost("");setTreatmentReason("");setTreatmentAttachments([]);setView("treatment");setShowCaseDetail(false)}
@@ -514,17 +519,32 @@ export default function Page(){
   setNotice("Discharge Request berhasil dikirim ke Call Center PertaLife.");
   setView("dashboard");setSelectedCaseId(null);
  }
- function requestConfirmation(id:string,stage:"Admission"|"Treatment"|"Discharge"){
-  const reason=window.prompt("Masukkan alasan Need Confirmation untuk Provider:");
-  if(!reason||!reason.trim())return;
-  const at=Date.now();setCases(v=>v.map(c=>c.id===id?withHistory({...c,confirmation:{stage,reason:reason.trim(),requestedAt:at},submittedAt:at},"Need Confirmation - "+stage,"Call Center PertaLife",reason.trim(),at):c));
-  setNotice("Need Confirmation dikirim ke Provider.");
- }
- function respondConfirmation(id:string){
-  const response=window.prompt("Masukkan respons / klarifikasi untuk PertaLife:");
-  if(!response||!response.trim())return;
-  const at=Date.now();setCases(v=>v.map(c=>c.id===id&&c.confirmation?withHistory({...c,confirmation:{...c.confirmation,response:response.trim(),respondedAt:at},submittedAt:at},"Confirmation Response",c.provider,response.trim(),at):c));
-  setNotice("Klarifikasi berhasil dikirim ke Call Center PertaLife.");
+ function sendCaseComment(){
+  if(!selectedCase||!commentText.trim())return;
+  const text=commentText.trim(),at=Date.now();
+  const stage:ConfirmationStage|null=selectedCase.status==="Waiting Admission"?"Admission":
+   selectedCase.status==="Waiting Treatment Approval"?"Treatment":
+   selectedCase.status==="Waiting Discharge"?"Discharge":null;
+  const pending=!!selectedCase.confirmation&&!selectedCase.confirmation.respondedAt;
+  const kind:CommentKind=role==="callcenter"?(commentMode==="need"&&stage?"need":"comment"):
+   commentMode==="reply"&&pending?"reply":"comment";
+  const actor=role==="callcenter"?"Call Center PertaLife":activeProvider.name;
+  const entry:CaseComment={
+   id:"CM-"+at.toString(36)+"-"+Math.random().toString(36).slice(2,8),
+   at,role,author:actor,providerCode:role==="provider"?activeProvider.code:undefined,kind,text,
+   stage:kind==="need"?stage||undefined:kind==="reply"?selectedCase.confirmation?.stage:undefined
+  };
+  setCases(current=>current.map(c=>{
+   if(c.id!==selectedCase.id)return c;
+   const update:CareCase={...c,comments:[...(c.comments||[]),entry]};
+   if(kind==="need"&&stage)update.confirmation={stage,reason:text,requestedAt:at};
+   else if(kind==="reply"&&c.confirmation&&!c.confirmation.respondedAt)
+    update.confirmation={...c.confirmation,response:text,respondedAt:at};
+   const event=kind==="need"?"Need Confirmation - "+stage:kind==="reply"?"Confirmation Response":"Case Comment";
+   return withHistory(update,event,actor,text,at);
+  }));
+  setCommentText("");
+  setCommentMode("comment");
  }
  function openProviderProfile(){
   const profile=providerProfiles[activeProvider.code]||defaultProviderProfiles[activeProvider.code];
@@ -798,8 +818,19 @@ export default function Page(){
   {showCaseDetail&&selectedCase&&hydrated&&createPortal(
   <div className="caseModalOverlay" role="presentation"
    onMouseDown={event=>{if(event.target===event.currentTarget)setShowCaseDetail(false)}}
-   onKeyDown={event=>{if(event.key==="Tab"){event.preventDefault();caseDetailCloseRef.current?.focus()}}}>
-   <section className="card caseDetail caseModalDialog" role="dialog" aria-modal="true" aria-labelledby="case-modal-title" aria-describedby="case-modal-person">
+   onKeyDown={event=>{
+     if(event.key!=="Tab")return;
+     const focusable=Array.from(caseDetailDialogRef.current?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])')||[]);
+     if(!focusable.length)return;
+     const first=focusable[0],last=focusable[focusable.length-1];
+     if(event.shiftKey&&(document.activeElement===first||!caseDetailDialogRef.current?.contains(document.activeElement))){
+      event.preventDefault();last.focus();
+     }else if(!event.shiftKey&&(document.activeElement===last||!caseDetailDialogRef.current?.contains(document.activeElement))){
+      event.preventDefault();first.focus();
+     }
+    }>
+   <section ref={caseDetailDialogRef} className="card caseDetail caseModalDialog" role="dialog" aria-modal="true" aria-labelledby="case-modal-title" aria-describedby="case-modal-person">
    <div className="sectionHead caseModalHeader"><div><h2 id="case-modal-title">Detail Case {selectedCase.id}{selectedCase.demo?" — DUMMY / SIMULASI":""}</h2><p id="case-modal-person">{selectedCase.name} · {selectedCase.memberId}</p></div><button type="button" ref={caseDetailCloseRef} className="reviewClear caseModalClose" onClick={()=>setShowCaseDetail(false)} aria-label="Tutup detail case"><X size={17}/> Tutup</button></div>
    <div className="detailGrid detailGridWide caseDetailGrid">
     <div><span>Status</span><b>{selectedCase.status}</b></div><div><span>Tingkat Pelayanan</span><b>{selectedCase.careLevel||"FKTP (legacy)"}</b></div><div><span>Jalur Akses</span><b>{selectedCase.accessRoute||"FKTP (legacy)"}</b></div>{selectedCase.parentCaseId&&<div><span>Episode FKTP Asal</span><b>{selectedCase.parentCaseId}</b></div>}{selectedCase.specialty&&<div><span>Poli Spesialis</span><b>{selectedCase.specialty}</b></div>}{selectedCase.referral&&<><div><span>Status Rujukan</span><b>{selectedCase.referral.status}</b></div><div><span>Rujukan</span><b>{selectedCase.referral.refNumber} · {selectedCase.referral.specialty}</b></div><div><span>Catatan Verifikasi Rujukan</span><b>{selectedCase.referral.reviewNote||"-"}</b></div>{selectedCase.referral.linkedCaseId&&<div><span>Episode FKRTL Terkait</span><b>{selectedCase.referral.linkedCaseId}</b></div>}</>}<div><span>Provider</span><b>{selectedCase.provider}</b></div><div><span>Provider Code</span><b>{selectedCase.providerCode||"-"}</b></div><div><span>Jenis Kunjungan</span><b>{selectedCase.visitType}</b></div>
