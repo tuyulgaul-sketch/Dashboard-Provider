@@ -910,6 +910,37 @@ export default function Page(){
    <div className="workflowActions"><span>Peserta belum dianggap selesai sampai Call Center melakukan verifikasi discharge.</span><button className="primary" disabled={!finalDiagnosis.trim()||!finalBill.trim()} onClick={submitDischarge}>Submit Discharge <ArrowRight size={17}/></button></div>
   </section>}
 
+  {role==="provider"&&view==="claim-list"&&<section className="card claimRegistry">
+   <div className="sectionHead"><div><h2>Pengajuan Klaim Provider</h2><p>Daftar nomor pengajuan single dan bundle yang telah dikirim ke PertaLife. Klik nomor untuk melihat peserta, rincian case, dan lampiran.</p></div>
+    <button type="button" className="primary" onClick={()=>{setView("history");setSelectedClaimCases([]);setClaimDraft(null)}}><Plus size={16}/>Buat Pengajuan dari Riwayat Discharge</button>
+   </div>
+   <div className="claimRegistryStats"><span><b>{providerSubmissions.length}</b> nomor pengajuan</span><span><b>{providerSubmissions.reduce((sum,item)=>sum+item.cases.length,0)}</b> case peserta</span><span><b>{formatRupiah(providerSubmissions.reduce((sum,item)=>sum+item.cases.reduce((a,c)=>a+(c.dischargeRequest?.finalBill||0),0),0))}</b> total nilai</span></div>
+   {providerSubmissions.length===0?<div className="claimRegistryEmpty"><FileSpreadsheet size={28}/><b>Belum ada pengajuan klaim</b><p>Setelah discharge disetujui, buat pengajuan single atau bundle dari menu Riwayat Discharge. Nomor pengajuan akan muncul di sini.</p></div>:
+    <div className="claimRegistryEntries">{providerSubmissions.map(item=>{
+     const expanded=expandedClaimId===item.id;
+     const subtotal=item.cases.reduce((sum,c)=>sum+(c.dischargeRequest?.finalBill||0),0);
+     return <div className={"claimRegistryEntry "+(expanded?"expanded":"")} key={item.id}>
+      <button type="button" className="claimRegistryEntryHead" aria-expanded={expanded} onClick={()=>setExpandedClaimId(expanded?null:item.id)}>
+       <span className="claimRegistryId"><FileSpreadsheet size={17}/><b>{item.id}</b><small>{new Date(item.submission.submittedAt||Date.now()).toLocaleString("id-ID")}</small></span>
+       <span className="claimRegistryCount">{item.cases.length} case / peserta</span>
+       <span className="claimRegistryAmount">{formatRupiah(subtotal)}</span>
+       <span className="claimRegistryStatus">{item.cases.every(c=>c.billing?.status==="Paid")?"Paid":item.cases.some(c=>c.billing?.status==="Paid")?"Sebagian Paid":item.cases[0]?.billing?.status||"Submitted"}</span>
+       <ChevronDown size={18} className={expanded?"claimRegistryChevron open":"claimRegistryChevron"}/>
+      </button>
+      {expanded&&<div className="claimRegistryDetail">
+       <div className="claimRegistryMeta"><span><b>Provider:</b> {item.cases[0]?.provider||"-"}</span><span><b>Jenis Pelayanan:</b> {claimTypeSummary(item.cases)}</span><span><b>Metode:</b> Transfer</span></div>
+       <div className="tableWrap"><table><thead><tr><th>Case</th><th>Peserta</th><th>Admission / Jenis Klaim</th><th>Diagnosis</th><th>Final Bill</th><th>Aksi</th></tr></thead>
+        <tbody>{item.cases.map(c=><tr key={c.id}><td><b>{c.id}</b></td><td><b>{c.name}</b><small>{c.memberId}</small></td><td>{claimTypeFromAdmission(c)}</td><td>{c.dischargeRequest?.finalDiagnosis||"-"}</td><td><b>{formatRupiah(c.dischargeRequest?.finalBill||0)}</b></td><td><button type="button" className="reviewClear" onClick={()=>openCaseDetail(c.id)}><Eye size={15}/>Detail Case</button></td></tr>)}</tbody>
+       </table></div>
+       <div className="claimRegistryFiles"><h3>Dokumen Pengajuan ({item.submission.files?.length||0})</h3>
+        {!item.submission.files?.length?<p>Belum ada file klaim pada nomor pengajuan ini. Pengajuan lama mungkin hanya menyimpan nama file.</p>:
+         <div>{item.submission.files.map(file=><button type="button" key={file.id} onClick={()=>downloadStoredAttachment(file)}><FileSpreadsheet size={15}/><span>{file.name}</span><small>{fileSizeLabel(file.size)}</small></button>)}</div>}
+       </div>
+      </div>}
+     </div>;
+    })}</div>}
+  </section>}
+
   {view==="claim"&&selectedCase&&role==="provider"&&claimDraft&&<section className="card claimForm">
    <div className="sectionHead"><div><h2>Pengajuan Klaim Pembayaran</h2><p>{claimDraft.bundleId||selectedCase.id} · {claimDraft.bundleCaseIds?.length||1} case · Total {formatRupiah(claimDraft.bundleTotalBill||selectedCase.dischargeRequest?.finalBill||0)}</p></div><button className="reviewClear" onClick={()=>{setClaimDraft(null);setSelectedCaseId(null);setView("history")}}><X size={15}/> Batal</button></div>
    {claimDraft.bundleCaseIds&&<div className="bundleSummary"><b>Case dalam Bundle</b><div className="tableWrap"><table><thead><tr><th>Case</th><th>Peserta</th><th>Diagnosis</th><th>Final Bill</th></tr></thead><tbody>{claimDraft.bundleCaseIds.map(id=>{const bc=cases.find(x=>x.id===id);return bc?<tr key={id}><td>{bc.id}</td><td><b>{bc.name}</b><small>{bc.memberId}</small></td><td>{bc.dischargeRequest?.finalDiagnosis||"-"}</td><td><b>{formatRupiah(bc.dischargeRequest?.finalBill||0)}</b></td></tr>:null})}</tbody></table></div></div>}
@@ -963,7 +994,8 @@ export default function Page(){
     <div><span>Telepon</span><b>{selectedCase.claimSubmission.phone||"-"}</b></div><div><span>Email</span><b>{selectedCase.claimSubmission.email||"-"}</b></div><div><span>Status Pengajuan</span><b>{selectedCase.claimSubmission.applicationStatus}</b></div><div><span>Checklist Prokes</span><b>{selectedCase.claimSubmission.claimProkes?"Ya":"Tidak"}</b></div>
     <div className="full"><span>Keterangan</span><b>{selectedCase.claimSubmission.description||"-"}</b></div>
    </div>
-   <div className="claimReceive"><label>Diterima Oleh<input value={selectedCase.claimSubmission.receivedBy} onChange={e=>updateClaimMeta(selectedCase.id,{receivedBy:e.target.value})} placeholder="Nama PIC PertaLife"/></label></div>
+   {!!selectedCase.claimSubmission.files?.length&&<div className="claimReviewAttachments"><h3>Dokumen Upload Provider ({selectedCase.claimSubmission.files.length})</h3><p>File terlampir untuk seluruh bundle pengajuan ini. Pada prototype, file hanya tersedia di browser tempat diunggah.</p><div>{selectedCase.claimSubmission.files.map(file=><button type="button" key={file.id} onClick={()=>downloadStoredAttachment(file)}><FileSpreadsheet size={14}/>{file.name}<small>{fileSizeLabel(file.size)}</small></button>)}</div></div>}
+    <div className="claimReceive"><label>Diterima Oleh<input value={selectedCase.claimSubmission.receivedBy} onChange={e=>updateClaimMeta(selectedCase.id,{receivedBy:e.target.value})} placeholder="Nama PIC PertaLife"/></label></div>
    <div className="claimDocs"><div className="claimDocsHead"><h3>Dokumen Persyaratan Klaim</h3><span>Checklist internal PertaLife: CS / CL / FA dan keterangan.</span></div>
     <table><thead><tr><th>No</th><th>Dokumen</th><th>Provider</th><th>CS</th><th>CL</th><th>FA</th><th>Keterangan</th></tr></thead><tbody>{selectedCase.claimSubmission.documents.map((d,i)=><tr key={d.label}><td>{i+1}</td><td><b>{d.label}</b><small>{d.fileName||"Tidak ada file"}</small></td><td><span className={d.submitted?"remarkOk":"remarkWarning"}>{d.submitted?"Ada":"Tidak Ada"}</span></td><td><input type="checkbox" checked={d.cs} onChange={e=>updateClaimDocument(selectedCase.id,i,{cs:e.target.checked})}/></td><td><input type="checkbox" checked={d.cl} onChange={e=>updateClaimDocument(selectedCase.id,i,{cl:e.target.checked})}/></td><td><input type="checkbox" checked={d.fa} onChange={e=>updateClaimDocument(selectedCase.id,i,{fa:e.target.checked})}/></td><td><input value={d.remark} onChange={e=>updateClaimDocument(selectedCase.id,i,{remark:e.target.value})} placeholder="Keterangan"/></td></tr>)}</tbody></table>
    </div>
