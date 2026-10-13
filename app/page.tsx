@@ -1257,6 +1257,54 @@ export default function Page(){
     {selectedCase.confirmation&&<><div><span>Need Confirmation</span><b>{selectedCase.confirmation.stage}: {selectedCase.confirmation.reason}</b></div><div><span>Respons Provider</span><b>{selectedCase.confirmation.response||"Belum ada respons"}</b></div></>}
     {selectedCase.billing&&<><div><span>Status Pembayaran</span><b>{selectedCase.billing.status}</b></div><div><span>Reminder</span><b>{selectedCase.billing.reminderCount||0} kali</b></div></>}
    </div>
+   {selectedCase.inpatient&&<section className="caseInpatientHistory">
+    <div className="caseSubhead"><BedDouble size={18}/><div><b>Rawat Inap — E-Form & Persetujuan</b><span>Peralihan dari case existing; data FKTP / FKRTL / Emergency sebelumnya tetap dipertahankan.</span></div></div>
+    <div className="inpatientAuditGrid">
+     <div><span>Tanggal Masuk</span><strong>{selectedCase.inpatient.request.admissionDate}</strong></div>
+     <div><span>Diagnosis Masuk</span><strong>{selectedCase.inpatient.request.admissionDiagnosis}</strong></div>
+     <div><span>Kamar / Tarif</span><strong>{selectedCase.inpatient.request.roomClass} · {formatRupiah(selectedCase.inpatient.request.roomRate)}/hari</strong></div>
+     <div><span>Dokter RS</span><strong>{selectedCase.inpatient.request.physicianName}</strong></div>
+     <div><span>Indikasi Rawat Inap</span><strong>{selectedCase.inpatient.request.mainComplaint}</strong></div>
+     <div><span>Diagnosis</span><strong>{selectedCase.inpatient.request.diagnosis}</strong></div>
+     <div><span>Tujuan Perawatan</span><strong>{selectedCase.inpatient.request.carePurpose}</strong></div>
+     <div><span>Estimasi Provider</span><strong>{selectedCase.inpatient.request.estimatedDays} hari</strong></div>
+     {selectedCase.inpatient.approval&&<><div><span>Disetujui Oleh</span><strong>dr. {selectedCase.inpatient.approval.doctor}</strong></div>
+      <div><span>Durasi Awal Disetujui</span><strong>{selectedCase.inpatient.approval.days} hari · s.d. {selectedCase.inpatient.approval.endDate}</strong></div>
+      <div><span>Catatan Approval</span><strong>{selectedCase.inpatient.approval.note}</strong></div></>}
+    </div>
+    <details className="inpatientFormDetails"><summary>Lihat Seluruh Keterangan Medis Form Rawat Inap</summary><div className="inpatientAuditGrid">
+     {([
+      ["Keluhan Tambahan",selectedCase.inpatient.request.additionalComplaint],
+      ["Lama Keluhan",selectedCase.inpatient.request.symptomDuration],
+      ["Kesadaran",selectedCase.inpatient.request.consciousness],
+      ["GCS",selectedCase.inpatient.request.gcs],["TTD",selectedCase.inpatient.request.bloodPressure],
+      ["Nadi",selectedCase.inpatient.request.pulse],["RR",selectedCase.inpatient.request.respiratoryRate],["Suhu",selectedCase.inpatient.request.temperature],
+      ["Etiologi Diagnosa",selectedCase.inpatient.request.etiology],["Pemeriksaan Penunjang",selectedCase.inpatient.request.supportingExams],
+      ["Terapi/Obat",selectedCase.inpatient.request.therapies],["Perawatan Sebelumnya",selectedCase.inpatient.request.priorCare],
+      ["Dokter Perujuk",selectedCase.inpatient.request.referringDoctor],["Rencana Operasi/Tindakan",selectedCase.inpatient.request.plannedProcedure],
+      ["Alasan Tindakan",selectedCase.inpatient.request.procedureReason],
+      ["Hak Kamar Peserta",formatRupiah(selectedCase.inpatient.request.roomEntitlement)],
+      ["Jenis Plan",selectedCase.inpatient.request.managedCarePlan],
+      ["Kondisi Terkait",Object.entries(selectedCase.inpatient.request.conditions||{}).map(([k,v])=>k+": "+(v||"-")).join(" | ")],
+      ["Penjelasan Kondisi",selectedCase.inpatient.request.conditionNotes],
+      ["Identitas Rumah Sakit",selectedCase.inpatient.request.hospitalSignatory],
+      ["Tanggal Pernyataan",selectedCase.inpatient.request.declaredAt]
+     ] as [string,string][]).map(([label,value])=><div key={label}><span>{label}</span><strong>{value||"-"}</strong></div>)}
+    </div></details>
+    {!!selectedCase.inpatient.extensions.length&&<div className="inpatientExtensionsAudit"><h4>Riwayat Perpanjangan</h4>{selectedCase.inpatient.extensions.map(x=><div key={x.id}><b>{x.status==="Approved"?"Approved":"Menunggu Approval"}</b><span>{x.reason}</span>{x.approvedDays&&<span>{x.approvedDays} hari tambahan · hingga {x.endDate} · dr. {x.doctor}</span>}</div>)}</div>}
+    {selectedCase.inpatient.billing&&<div className="inpatientBillAudit">
+     <h4>Perhitungan Pasien Pulang</h4>
+     <div className="inpatientAuditGrid"><div><span>Tanggal Keluar</span><strong>{selectedCase.inpatient.billing.exitDate}</strong></div>
+      <div><span>Diagnosa Akhir</span><strong>{selectedCase.inpatient.billing.finalDiagnosis}</strong></div>
+      <div><span>Biaya Diajukan</span><strong>{formatRupiah(totalSubmitted(selectedCase.inpatient.billing.lines))}</strong></div>
+      <div><span>Biaya Disetujui</span><strong>{selectedCase.inpatient.billing.reviewedAt?formatRupiah(selectedCase.inpatient.billing.lines.reduce((n,x)=>n+(x.approved||0),0)):"Menunggu verifikasi"}</strong></div>
+      <div><span>Biaya Tidak Dijaminkan</span><strong>{selectedCase.inpatient.billing.reviewedAt?formatRupiah(selectedCase.inpatient.billing.lines.reduce((n,x)=>n+(x.excluded||0),0)):"Menunggu verifikasi"}</strong></div>
+      <div><span>Catatan PertaLife</span><strong>{selectedCase.inpatient.billing.callCenterNotes||"-"}</strong></div></div>
+     <div className="inpatientBillTable"><table><thead><tr><th>Komponen</th><th>Diajukan</th><th>Disetujui</th><th>Tidak Dijaminkan</th></tr></thead><tbody>
+      {selectedCase.inpatient.billing.lines.map(line=><tr key={line.category}><td>{line.category}</td><td>{formatRupiah(line.submitted)}</td><td>{line.approved===undefined?"Menunggu":formatRupiah(line.approved)}</td><td>{line.excluded===undefined?"Menunggu":formatRupiah(line.excluded)}</td></tr>)}
+     </tbody></table></div>
+    </div>}
+   </section>}
    <section className="caseCommentsPanel" id="case-discussion" aria-label="Diskusi dan klarifikasi case">
     <div className="caseSubhead"><MessageSquareText size={18}/><div><b>Diskusi & Klarifikasi Case</b><span>Need Confirmation, respons Provider, dan komentar kedua pihak tersimpan sesuai waktu pengiriman.</span></div><span className="caseThreadCount">{modalComments.length} komentar</span></div>
     {awaitingProviderResponse&&<div className="casePendingConfirmation"><AlertTriangle size={17}/><div><strong>Menunggu respons Provider — {selectedCase.confirmation?.stage}</strong><span>{selectedCase.confirmation?.reason}</span></div></div>}
