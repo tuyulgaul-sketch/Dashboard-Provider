@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useState} from "react";
-import {Activity,ArrowRight,Building2,ChevronDown,Clock3,Database,FileCheck2,FileSpreadsheet,Settings,ShieldCheck,Stethoscope,UserRound} from "lucide-react";
+import {Activity,ArrowRight,BedDouble,Building2,ChevronDown,Clock3,Database,FileCheck2,FileSpreadsheet,Settings,ShieldCheck,Stethoscope,UserRound} from "lucide-react";
 
 type Role="provider"|"callcenter";
 type Item={label:string;view:string;icon:typeof Activity;route?:string;resetFilter?:boolean;profile?:boolean};
@@ -12,6 +12,7 @@ const providerGroups:Group[]=[
   {label:"Pendaftaran Peserta",view:"registration",icon:UserRound,resetFilter:true},
   {label:"Pengajuan Rujukan",view:"referrals",icon:ArrowRight},
   {label:"Treatment Request",view:"treatment",icon:Stethoscope,resetFilter:true},
+  {label:"Rawat Inap",view:"inpatient-list",icon:BedDouble,resetFilter:true},
   {label:"Discharge",view:"discharge",icon:FileCheck2,resetFilter:true},
   {label:"Case Peserta",view:"cases",icon:Activity,resetFilter:true}
  ]},
@@ -26,6 +27,7 @@ const providerGroups:Group[]=[
 const callCenterGroups:Group[]=[
  {key:"verification",label:"Verifikasi Medis",icon:ShieldCheck,items:[
   {label:"Verification Queue",view:"queue",icon:Clock3,resetFilter:true},
+  {label:"Approval Rawat Inap",view:"inpatient-approvals",icon:BedDouble,resetFilter:true},
   {label:"Referral Approval",view:"referrals",icon:ArrowRight},
   {label:"Eligibility Review",view:"eligibility",icon:ShieldCheck}
  ]},
