@@ -5,14 +5,14 @@ import type {CaseFileMeta} from "./case-files";
 
 type Props={
  title?:string;existing:readonly CaseFileMeta[];pending:readonly File[];
- disabled?:boolean;onAdd:(files:File[])=>void;onRemove:(index:number)=>void;
+ disabled?:boolean;required?:boolean;onAdd:(files:File[])=>void;onRemove:(index:number)=>void;
 };
-export default function CaseFilePicker({title="Lampirkan Dokumen",existing,pending,disabled=false,onAdd,onRemove}:Props){
+export default function CaseFilePicker({title="Lampirkan Dokumen",existing,pending,disabled=false,required=false,onAdd,onRemove}:Props){
  const used=existing.reduce((sum,file)=>sum+file.size,0)+pending.reduce((sum,file)=>sum+file.size,0);
  const count=existing.length+pending.length;
  const full=count>=CASE_FILE_LIMIT||used>=CASE_FILE_TOTAL_BYTES;
  return <div className="caseFilePicker">
-  <div className="caseFilePickerHead"><div><strong>{title}</strong><span>Semua tipe file · Maksimal 10 dokumen per case · Total gabungan 10 MB. Opsional.</span></div><span className="caseFileQuota">{count}/{CASE_FILE_LIMIT} file · {fileSizeLabel(used)}/10 MB</span></div>
+  <div className="caseFilePickerHead"><div><strong>{title}</strong><span>Semua tipe file · Maksimal 10 dokumen per case · Total gabungan 10 MB. {required?"Minimal 1 bukti tagihan wajib.":"Opsional."}</span></div><span className="caseFileQuota">{count}/{CASE_FILE_LIMIT} file · {fileSizeLabel(used)}/10 MB</span></div>
   <label className={"caseFileChoose "+(full||disabled?"disabled":"")}>
    <FilePlus2 size={17}/> {full?"Batas dokumen tercapai":"Pilih Dokumen"} 
    <input type="file" multiple disabled={disabled||full} aria-label="Unggah dokumen pendukung, maksimal 10 file dan 10 MB gabungan" onChange={event=>{onAdd(Array.from(event.currentTarget.files||[]));event.currentTarget.value="";}}/>
