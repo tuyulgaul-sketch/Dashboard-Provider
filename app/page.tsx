@@ -941,7 +941,7 @@ export default function Page(){
    <div className="dischargeBillEvidence">
     <div className="dischargeBillHead"><FileCheck2 size={20}/><div><strong>Bukti Tagihan Final Bill <span className="dischargeRequiredTag">WAJIB</span></strong><p>Unggah kwitansi, invoice, rincian biaya, atau bukti tagihan lainnya yang mendasari nominal Final Bill. Dokumen akan diperiksa Call Center sebelum approval.</p></div></div>
     <div className="dischargeBillAmount"><span>Nilai yang dimintakan persetujuan</span><strong>{formatRupiah(parseAmount(finalBill))}</strong></div>
-    <CaseFilePicker title="Unggah Kwitansi / Invoice / Rincian Biaya" existing={selectedCase.files||[]} pending={pendingDischargeFiles} disabled={uploadBusy} onAdd={files=>addPendingFiles("discharge",files)} onRemove={index=>removePendingFile("discharge",index)}/>
+    <CaseFilePicker required title="Unggah Kwitansi / Invoice / Rincian Biaya" existing={selectedCase.files||[]} pending={pendingDischargeFiles} disabled={uploadBusy} onAdd={files=>addPendingFiles("discharge",files)} onRemove={index=>removePendingFile("discharge",index)}/>
     {!pendingDischargeFiles.length&&<small className="dischargeBillHint">Tambahkan minimal 1 file sebagai dasar tagihan. Total seluruh lampiran case tetap maksimal 10 file / 10 MB.</small>}
     {attachmentError&&<div className="caseUploadError" role="alert">{attachmentError}</div>}
    </div>
@@ -1052,7 +1052,7 @@ export default function Page(){
        return <div className="medicalBillReview">
         <div className="medicalBillReviewHead"><div><strong>Verifikasi Final Bill</strong><small>Pastikan bukti tagihan sesuai dengan nominal yang diajukan Provider.</small></div><span className={hasEvidence?"medicalEvidenceReady":"medicalEvidenceMissing"}>{hasEvidence?evidence.length+" file":"Belum ada bukti"}</span></div>
         <div className="medicalBillValues"><div><span>Provider</span><strong>{current?.provider||"-"}</strong></div><div><span>Final Bill</span><strong>{formatRupiah(current?.dischargeRequest?.finalBill||0)}</strong></div><div><span>Diagnosis Akhir</span><strong>{current?.dischargeRequest?.finalDiagnosis||"-"}</strong></div></div>
-        {hasEvidence?<div className="medicalBillAttachments">{evidence.map(file=><button type="button" key={file.id} onClick={()=>downloadStoredAttachment(file)}><FileSpreadsheet size={16}/><span>{file.name}</span><small>{fileSizeLabel(file.size)}</small><Upload size={13}/></button>)}</div>:
+        {hasEvidence?<div className="medicalBillAttachments">{evidence.map(file=><button type="button" key={file.id} onClick={()=>downloadStoredAttachment(file)}><FileSpreadsheet size={16}/><span>{file.name}</span><small>{fileSizeLabel(file.size)}</small><ArrowRight size={13}/></button>)}</div>:
          <p className="medicalBillMissingNote">Case lama atau simulasi yang belum menyertakan lampiran Discharge. Mintakan bukti tagihan melalui Diskusi/Need Confirmation bila diperlukan sebelum approval.</p>}
         {hasEvidence&&<label className="medicalBillConfirm"><input type="checkbox" checked={dischargeEvidenceReviewed} onChange={e=>setDischargeEvidenceReviewed(e.target.checked)}/><span>Saya telah memeriksa dokumen pendukung terhadap Final Bill di atas.</span></label>}
        </div>;
