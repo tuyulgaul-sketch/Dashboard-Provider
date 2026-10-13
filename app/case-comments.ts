@@ -1,7 +1,7 @@
 /** Prototype-only comment timeline helpers. No remote storage or authentication. */
 export type CommentRole="provider"|"callcenter";
 export type CommentKind="need"|"reply"|"comment";
-export type ConfirmationStage="Admission"|"Treatment"|"Discharge";
+export type ConfirmationStage="Admission"|"Treatment"|"Discharge"|"Inpatient";
 export type CaseComment={
  id:string;at:number;role:CommentRole;author:string;providerCode?:string;
  kind:CommentKind;text:string;stage?:ConfirmationStage;fileIds?:string[];
@@ -24,7 +24,7 @@ export function caseComments(c:CommentCaseShape):CaseComment[]{
  for(const h of c.history||[]){
   if(h.event.startsWith("Need Confirmation - ")){
    const stage=h.event.slice("Need Confirmation - ".length);
-   pushLegacy(h.at,"need","callcenter",h.actor||"Call Center PertaLife",h.detail||"",stage==="Admission"||stage==="Treatment"||stage==="Discharge"?stage:undefined);
+   pushLegacy(h.at,"need","callcenter",h.actor||"Call Center PertaLife",h.detail||"",stage==="Admission"||stage==="Treatment"||stage==="Discharge"||stage==="Inpatient"?stage:undefined);
   }else if(h.event==="Confirmation Response"){
    pushLegacy(h.at,"reply","provider",h.actor||"Provider",h.detail||"");
   }
