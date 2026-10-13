@@ -4,7 +4,7 @@ export type CommentKind="need"|"reply"|"comment";
 export type ConfirmationStage="Admission"|"Treatment"|"Discharge";
 export type CaseComment={
  id:string;at:number;role:CommentRole;author:string;providerCode?:string;
- kind:CommentKind;text:string;stage?:ConfirmationStage;
+ kind:CommentKind;text:string;stage?:ConfirmationStage;fileIds?:string[];
 };
 export type CommentCaseShape={
  comments?:CaseComment[];
