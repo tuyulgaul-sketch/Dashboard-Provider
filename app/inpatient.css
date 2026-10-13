@@ -57,3 +57,12 @@
  .inpatientActions button {width:100%;justify-content:center;}
  .inpatientReviewDialog {width:100%;max-height:calc(100dvh - 16px);border-radius:13px;}
 }
+
+.inpatientBillReviewFiles {display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid #d8e7f4;background:#f8fbff;border-radius:10px;}
+.inpatientBillReviewFiles>strong {font-size:12px;color:#235684;}
+.inpatientBillReviewFiles>button {display:flex;align-items:center;gap:9px;background:white;border:1px solid #c8dded;border-radius:9px;padding:9px 11px;color:#245a88;cursor:pointer;text-align:left;}
+.inpatientBillReviewFiles>button>span {flex:1;min-width:0;overflow-wrap:anywhere;font-size:11px;font-weight:750;}
+.inpatientBillReviewFiles>button>small {font-size:10px;white-space:nowrap;color:#748da5;}
+.inpatientBillReviewFiles>button:hover {background:#eaf5ff;}
+.inpatientBillReviewFiles label {display:flex;flex-direction:row;align-items:center;gap:9px;color:#285c85;font-size:11px;font-weight:750;}
+.inpatientBillReviewFiles label input {width:17px;height:17px;flex-shrink:0;}
