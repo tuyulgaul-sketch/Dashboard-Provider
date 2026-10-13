@@ -37,7 +37,7 @@ type CaseHistory={at:number;actor:string;event:string;detail?:string};
 type CareCase={id:string;name:string;memberId:string;company:string;provider:string;providerCode?:string;status:CaseStatus;urgent:boolean;submittedAt:number;issue:string;visitType:string;careLevel?:"FKTP"|"FKRTL";accessRoute?:"FKTP"|"Emergency"|"Referral";parentCaseId?:string;originReferralId?:string;specialty?:string;referral?:ReferralRequest;urgencyReason?:string;policyNo?:string;planName?:string;
  treatmentRequest?:{diagnosis:string;procedure:string;medication:string;reason?:string;attachments?:string[];estimatedCost:number;submittedAt:number};
  treatmentApproval?:{doctor:string;note:string;approvedAt:number};
- dischargeRequest?:{finalDiagnosis:string;finalBill:number;notes:string;submittedAt:number};
+ dischargeRequest?:{finalDiagnosis:string;finalBill:number;notes:string;submittedAt:number;fileIds?:string[]};
  dischargeApproval?:{doctor:string;note:string;approvedAt:number};
  confirmation?:{stage:"Admission"|"Treatment"|"Discharge";reason:string;requestedAt:number;response?:string;respondedAt?:number};
  comments?:CaseComment[];
@@ -219,6 +219,7 @@ export default function Page(){
  const [pendingAdmissionFiles,setPendingAdmissionFiles]=useState<File[]>([]);
  const [pendingCommentFiles,setPendingCommentFiles]=useState<File[]>([]);
  const [pendingTreatmentFiles,setPendingTreatmentFiles]=useState<File[]>([]);
+ const [pendingDischargeFiles,setPendingDischargeFiles]=useState<File[]>([]);
  const [attachmentError,setAttachmentError]=useState("");
  const [uploadBusy,setUploadBusy]=useState(false);
  const [commentMode,setCommentMode]=useState<CommentKind>("comment");
@@ -232,6 +233,7 @@ export default function Page(){
  const [medicalModal,setMedicalModal]=useState<{caseId:string;stage:"Treatment"|"Discharge"}|null>(null);
  const [medicalDoctor,setMedicalDoctor]=useState("");
  const [medicalNote,setMedicalNote]=useState("");
+ const [dischargeEvidenceReviewed,setDischargeEvidenceReviewed]=useState(false);
  const [providerProfiles,setProviderProfiles]=useState<Record<string,ProviderProfile>>(defaultProviderProfiles),[profileDraft,setProfileDraft]=useState<ProviderProfile|null>(null),[bankSearch,setBankSearch]=useState(""),[bankOpen,setBankOpen]=useState(false);
  const [uploadReview,setUploadReview]=useState<UploadReview|null>(null); const [reviewFilter,setReviewFilter]=useState("all"); const [memberPage,setMemberPage]=useState(1); const [memberPageSize,setMemberPageSize]=useState(50);
 
@@ -326,23 +328,25 @@ export default function Page(){
  const modalComments=selectedCase?caseComments(selectedCase):[];
  const caseFileList=selectedCase?.files||[];
  const caseFileBytes=caseFileList.reduce((sum,file)=>sum+file.size,0);
- function addPendingFiles(stage:"admission"|"comment"|"treatment",files:File[]){
+ function addPendingFiles(stage:"admission"|"comment"|"treatment"|"discharge",files:File[]){
   if(!files.length)return;
-  const current=stage==="admission"?pendingAdmissionFiles:stage==="comment"?pendingCommentFiles:pendingTreatmentFiles;
+  const current=stage==="admission"?pendingAdmissionFiles:stage==="comment"?pendingCommentFiles:stage==="treatment"?pendingTreatmentFiles:pendingDischargeFiles;
   const existing=stage==="admission"?[]:selectedCase?.files||[];
   try{
    validateCaseFiles(existing,current,files);
    const updated=[...current,...files];
    if(stage==="admission")setPendingAdmissionFiles(updated);
    else if(stage==="comment")setPendingCommentFiles(updated);
-   else setPendingTreatmentFiles(updated);
+   else if(stage==="treatment")setPendingTreatmentFiles(updated);
+   else setPendingDischargeFiles(updated);
    setAttachmentError("");
   }catch(error){setAttachmentError(error instanceof Error?error.message:"Lampiran melampaui batas maksimum.");}
  }
- function removePendingFile(stage:"admission"|"comment"|"treatment",index:number){
+ function removePendingFile(stage:"admission"|"comment"|"treatment"|"discharge",index:number){
   if(stage==="admission")setPendingAdmissionFiles(v=>v.filter((_,i)=>i!==index));
   else if(stage==="comment")setPendingCommentFiles(v=>v.filter((_,i)=>i!==index));
-  else setPendingTreatmentFiles(v=>v.filter((_,i)=>i!==index));
+  else if(stage==="treatment")setPendingTreatmentFiles(v=>v.filter((_,i)=>i!==index));
+  else setPendingDischargeFiles(v=>v.filter((_,i)=>i!==index));
   setAttachmentError("");
  }
  async function downloadStoredAttachment(file:CaseFileMeta){
@@ -585,12 +589,35 @@ export default function Page(){
   }catch(error){setAttachmentError(error instanceof Error?error.message:"Lampiran gagal disimpan. Treatment belum diajukan.");}
   finally{setUploadBusy(false);}
  }
- function openDischarge(id:string){setSelectedCaseId(id);setFinalDiagnosis("");setFinalBill("");setDischargeNotes("");setView("discharge");setShowCaseDetail(false)}
- function submitDischarge(){
-  if(!selectedCase||!finalDiagnosis.trim()||!finalBill.trim())return;
-  const at=Date.now();setCases(v=>v.map(c=>c.id===selectedCase.id?withHistory({...c,status:"Waiting Discharge",submittedAt:at,dischargeRequest:{finalDiagnosis:finalDiagnosis.trim(),finalBill:parseAmount(finalBill),notes:dischargeNotes.trim(),submittedAt:at}},"Discharge Submitted",c.provider,finalDiagnosis.trim()+" · "+formatRupiah(parseAmount(finalBill)),at):c));
-  setNotice("Discharge Request berhasil dikirim ke Call Center PertaLife.");
-  setView("dashboard");setSelectedCaseId(null);
+ function openDischarge(id:string){
+  setSelectedCaseId(id);setFinalDiagnosis("");setFinalBill("");setDischargeNotes("");
+  setPendingDischargeFiles([]);setAttachmentError("");setView("discharge");setShowCaseDetail(false);
+ }
+ async function submitDischarge(){
+  if(!selectedCase||!finalDiagnosis.trim()||!finalBill.trim()||uploadBusy)return;
+  const finalAmount=parseAmount(finalBill);
+  if(!Number.isFinite(finalAmount)||finalAmount<=0){
+   setAttachmentError("Nominal Final Bill harus lebih besar dari Rp0.");return;
+  }
+  if(!pendingDischargeFiles.length){
+   setAttachmentError("Wajib melampirkan minimal satu bukti tagihan (kwitansi, invoice, atau rincian biaya) untuk dasar verifikasi Final Bill.");return;
+  }
+  const caseId=selectedCase.id;
+  setUploadBusy(true);setAttachmentError("");
+  try{
+   validateCaseFiles(selectedCase.files||[],[],pendingDischargeFiles);
+   const files=await saveCaseFiles(caseId,pendingDischargeFiles,"discharge");
+   const at=Date.now();
+   setCases(v=>v.map(c=>c.id===caseId?withHistory({
+    ...c,status:"Waiting Discharge",submittedAt:at,files:[...(c.files||[]),...files],
+    dischargeRequest:{finalDiagnosis:finalDiagnosis.trim(),finalBill:finalAmount,notes:dischargeNotes.trim(),submittedAt:at,fileIds:files.map(file=>file.id)}
+   },"Discharge Submitted",c.provider,
+    finalDiagnosis.trim()+" · "+formatRupiah(finalAmount)+" · "+files.length+" bukti tagihan",at):c));
+   setPendingDischargeFiles([]);
+   setNotice("Discharge Request beserta "+files.length+" bukti tagihan berhasil dikirim untuk verifikasi Call Center.");
+   setView("dashboard");setSelectedCaseId(null);
+  }catch(error){setAttachmentError(error instanceof Error?error.message:"Bukti tagihan tidak berhasil disimpan. Discharge belum dikirim.");}
+  finally{setUploadBusy(false);}
  }
  async function sendCaseComment(){
   if(!selectedCase||(!commentText.trim()&&!pendingCommentFiles.length)||uploadBusy)return;
@@ -729,7 +756,7 @@ export default function Page(){
  function approveMedical(id:string,stage:"Treatment"|"Discharge"){
   const current=cases.find(c=>c.id===id);
   if(role!=="callcenter"||!current||current.status!==(stage==="Treatment"?"Waiting Treatment Approval":"Waiting Discharge"))return;
-  setMedicalModal({caseId:id,stage});setMedicalDoctor("");setMedicalNote("");setShowCaseDetail(false);
+  setMedicalModal({caseId:id,stage});setMedicalDoctor("");setMedicalNote("");setDischargeEvidenceReviewed(false);setShowCaseDetail(false);
  }
  function submitMedicalApproval(){
   if(!medicalModal||!medicalDoctor.trim()||!medicalNote.trim()||role!=="callcenter")return;
@@ -738,6 +765,10 @@ export default function Page(){
   if(cases.find(c=>c.id===caseId)?.status!==expected){
    setNotice("Status case telah berubah. Silakan muat ulang antrean approval.");setMedicalModal(null);return;
   }
+  const c=cases.find(item=>item.id===caseId);
+  if(stage==="Discharge"&&c?.dischargeRequest?.fileIds?.length&&!dischargeEvidenceReviewed){
+   setNotice("Periksa bukti tagihan dan centang konfirmasi review sebelum melakukan Approval Discharge.");return;
+  }
   const at=Date.now(),doctor=medicalDoctor.trim(),note=medicalNote.trim();
   setCases(v=>v.map(c=>c.id===caseId?stage==="Treatment"?
    withHistory({...c,status:"Treatment Approved",treatmentApproval:{doctor,note,approvedAt:at},confirmation:undefined,submittedAt:at},
@@ -745,7 +776,7 @@ export default function Page(){
    withHistory({...c,status:"Closed",dischargeApproval:{doctor,note,approvedAt:at},confirmation:undefined,submittedAt:at},
     "Final Discharge Approved","dr. "+doctor+" / PertaLife",note,at):c));
   setNotice((stage==="Treatment"?"Treatment":"Final discharge")+" disetujui oleh dr. "+doctor+".");
-  setMedicalModal(null);setMedicalDoctor("");setMedicalNote("");
+  setMedicalModal(null);setMedicalDoctor("");setMedicalNote("");setDischargeEvidenceReviewed(false);
  }
  useEffect(()=>{
   if(!medicalModal)return;
