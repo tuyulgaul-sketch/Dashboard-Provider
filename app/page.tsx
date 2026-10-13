@@ -840,6 +840,32 @@ export default function Page(){
     {selectedCase.confirmation&&<><div><span>Need Confirmation</span><b>{selectedCase.confirmation.stage}: {selectedCase.confirmation.reason}</b></div><div><span>Respons Provider</span><b>{selectedCase.confirmation.response||"Belum ada respons"}</b></div></>}
     {selectedCase.billing&&<><div><span>Status Pembayaran</span><b>{selectedCase.billing.status}</b></div><div><span>Reminder</span><b>{selectedCase.billing.reminderCount||0} kali</b></div></>}
    </div>
+   <section className="caseCommentsPanel" id="case-discussion" aria-label="Diskusi dan klarifikasi case">
+    <div className="caseSubhead"><MessageSquareText size={18}/><div><b>Diskusi & Klarifikasi Case</b><span>Need Confirmation, respons Provider, dan komentar kedua pihak tersimpan sesuai waktu pengiriman.</span></div><span className="caseThreadCount">{modalComments.length} komentar</span></div>
+    {awaitingProviderResponse&&<div className="casePendingConfirmation"><AlertTriangle size={17}/><div><strong>Menunggu respons Provider — {selectedCase.confirmation?.stage}</strong><span>{selectedCase.confirmation?.reason}</span></div></div>}
+    <div className="caseCommentThread" aria-live="polite">
+     {modalComments.length===0?<div className="caseNoComments">Belum ada komentar. Gunakan formulir di bawah untuk memulai diskusi terkait case ini.</div>:
+      modalComments.map(comment=><article key={comment.id} className={"caseCommentMessage "+(comment.role===role?"own":"incoming")}>
+       <div className="caseCommentMeta"><strong>{comment.author}</strong><span className={"caseCommentType "+(comment.kind==="need"?"needs":comment.kind==="reply"?"replied":"")}>{comment.kind==="need"?"Need Confirmation"+(comment.stage?" · "+comment.stage:""):comment.kind==="reply"?"Respons Provider":"Komentar"}</span><time dateTime={new Date(comment.at).toISOString()}>{new Date(comment.at).toLocaleString("id-ID")}</time></div>
+       <p>{comment.text}</p>
+      </article>)}
+    </div>
+    <form className="caseCommentCompose" onSubmit={event=>{event.preventDefault();sendCaseComment()}}>
+     <div className="caseCommentComposeTitle"><strong>{role==="callcenter"?"Komentar Call Center PertaLife":"Komentar Provider"}</strong><span>{role==="callcenter"?"Tentukan jenis pesan untuk Provider.":"Balas klarifikasi atau tambahkan catatan pelayanan."}</span></div>
+     <div className="caseCommentModes" role="group" aria-label="Jenis pesan">
+      {role==="callcenter"?<>
+       {confirmationStage&&<button type="button" className={commentMode==="need"?"selected":""} aria-pressed={commentMode==="need"} onClick={()=>setCommentMode("need")}>Need Confirmation · {confirmationStage}</button>}
+       <button type="button" className={commentMode==="comment"?"selected":""} aria-pressed={commentMode==="comment"} onClick={()=>setCommentMode("comment")}>Komentar biasa</button>
+      </>:<>
+       {awaitingProviderResponse&&<button type="button" className={commentMode==="reply"?"selected":""} aria-pressed={commentMode==="reply"} onClick={()=>setCommentMode("reply")}>Balas Need Confirmation</button>}
+       <button type="button" className={commentMode==="comment"?"selected":""} aria-pressed={commentMode==="comment"} onClick={()=>setCommentMode("comment")}>Komentar biasa</button>
+      </>}
+     </div>
+     <label htmlFor="case-comment-input">Isi komentar</label>
+     <textarea id="case-comment-input" rows={3} maxLength={4000} value={commentText} onChange={event=>setCommentText(event.target.value)} placeholder={commentMode==="need"?"Jelaskan dokumen atau informasi yang harus dikonfirmasi Provider...":commentMode==="reply"?"Tulis jawaban atau klarifikasi untuk Call Center...":"Tulis catatan untuk pihak lain terkait case ini..."} required/>
+     <div className="caseCommentActions"><span>Pesan menjadi history case dan ditandai sebagai komentar baru untuk pihak penerima.</span><button type="submit" className="primary" disabled={!commentText.trim()}><Send size={15}/>{commentMode==="need"&&confirmationStage?"Kirim Need Confirmation":commentMode==="reply"&&awaitingProviderResponse?"Kirim Respons":"Kirim Komentar"}</button></div>
+    </form>
+   </section>
    <div className="caseEvidence">
     <div className="caseSubhead"><Upload size={17}/><div><b>Lampiran Case</b><span>Dokumen/foto yang dikirim Provider pada treatment dan klaim.</span></div></div>
     <div className="evidenceList">
