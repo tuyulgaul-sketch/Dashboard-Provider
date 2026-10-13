@@ -3,7 +3,8 @@ import {useEffect,useMemo,useRef,useState} from "react";
 import {createPortal} from "react-dom";
 import {caseComments,commentReadKey,unreadCaseComments} from "./case-comments";
 import type {CaseComment,CommentKind,ConfirmationStage} from "./case-comments";
-import {CASE_FILE_LIMIT,CASE_FILE_TOTAL_BYTES,downloadCaseFile,fileSizeLabel,saveCaseFiles,validateCaseFiles} from "./case-files";
+import {downloadCaseFile,fileSizeLabel,saveCaseFiles,validateCaseFiles} from "./case-files";
+import CaseFilePicker from "./CaseFilePicker";
 import type {CaseFileMeta} from "./case-files";
 import {Activity,AlertTriangle,ArrowRight,Building2,CheckCircle2,ChevronDown,ChevronLeft,ChevronRight,Clock3,Database,Eye,FileCheck2,FileSpreadsheet,MessageSquareText,Plus,Search,Send,Settings,ShieldCheck,Stethoscope,Trash2,Upload,UserRound,X} from "lucide-react";
 import SidebarNavigation from "./SidebarNavigation";
@@ -792,7 +793,9 @@ export default function Page(){
      <div><span>Plan</span><b>{found.planName||"-"} {found.planCode?"("+found.planCode+")":""}</b></div><div><span>Coverage</span><b>{niceDate(found.inception||found.startDate)} - {niceDate(found.expiry||found.endDate)}</b></div><div><span>Card No</span><b>{found.cardNo}</b></div>
     </div>
     {careAccess==="FKTP"&&!faskesMatch&&active&&<div className="override"><label className="check"><input type="checkbox" checked={urgent} onChange={e=>setUrgent(e.target.checked)}/>Ajukan pengecualian Faskes 1 (butuh verifikasi)</label>{urgent&&<><label>Alasan Urgent<select value={urgencyReason} onChange={e=>setUrgencyReason(e.target.value)}><option value="">Pilih alasan</option>{urgencyOptions.map(x=><option key={x}>{x}</option>)}</select></label>{urgencyReason==="Lainnya"&&<label>Penjelasan<input value={urgencyText} onChange={e=>setUrgencyText(e.target.value)} placeholder="Jelaskan alasan urgency"/></label>}</>}</div>}
-    <div className="admissionBox"><label>{careAccess==="Emergency"?"Hasil Triase / Asesmen Darurat *":"Keluhan / Indikasi *"}<textarea value={complaint} onChange={e=>setComplaint(e.target.value)} placeholder={careAccess==="Emergency"?"Jelaskan kondisi darurat, hasil triase, tanda vital bila ada, dan penanganan awal...":"Jelaskan keluhan utama peserta"}/></label><button className="primary" disabled={!canSubmit} onClick={submitAdmission}>{careAccess==="Emergency"?"Submit Admission Darurat":"Submit Admission FKTP"} <ArrowRight size={17}/></button>{!active&&<small>Coverage peserta sedang tidak aktif berdasarkan periode INCEPTION/EXPIRY atau START/END DATE.</small>}{careAccess==="Emergency"&&<small>Jalur emergency mengikuti asesmen kegawatdaruratan. Admission tetap diverifikasi Call Center; penanganan pasien tidak ditunda.</small>}{careAccess==="FKTP"&&active&&!faskesMatch&&!urgent&&<small>{faskesMapped?"Submit terkunci karena Faskes 1 tidak sesuai.":"Submit normal terkunci karena Faskes 1 belum dimapping."} Aktifkan permintaan pengecualian jika diperlukan; Call Center tetap harus memverifikasi.</small>}</div>
+    <CaseFilePicker title="Dokumen Pendukung Admission" existing={[]} pending={pendingAdmissionFiles} disabled={uploadBusy} onAdd={files=>addPendingFiles("admission",files)} onRemove={index=>removePendingFile("admission",index)}/>
+    {attachmentError&&<div className="caseUploadError" role="alert">{attachmentError}</div>}
+    <div className="admissionBox"><label>{careAccess==="Emergency"?"Hasil Triase / Asesmen Darurat *":"Keluhan / Indikasi *"}<textarea value={complaint} onChange={e=>setComplaint(e.target.value)} placeholder={careAccess==="Emergency"?"Jelaskan kondisi darurat, hasil triase, tanda vital bila ada, dan penanganan awal...":"Jelaskan keluhan utama peserta"}/></label><button className="primary" disabled={!canSubmit||uploadBusy} onClick={submitAdmission}>{careAccess==="Emergency"?"Submit Admission Darurat":"Submit Admission FKTP"} <ArrowRight size={17}/></button>{!active&&<small>Coverage peserta sedang tidak aktif berdasarkan periode INCEPTION/EXPIRY atau START/END DATE.</small>}{careAccess==="Emergency"&&<small>Jalur emergency mengikuti asesmen kegawatdaruratan. Admission tetap diverifikasi Call Center; penanganan pasien tidak ditunda.</small>}{careAccess==="FKTP"&&active&&!faskesMatch&&!urgent&&<small>{faskesMapped?"Submit terkunci karena Faskes 1 tidak sesuai.":"Submit normal terkunci karena Faskes 1 belum dimapping."} Aktifkan permintaan pengecualian jika diperlukan; Call Center tetap harus memverifikasi.</small>}</div>
    </div>}
    </>}
   </section>}
@@ -819,8 +822,9 @@ export default function Page(){
     <label className="full">Obat / Resep<textarea value={treatmentMedication} onChange={e=>setTreatmentMedication(e.target.value)} placeholder="Nama obat, dosis, frekuensi, durasi, qty bila ada"/></label>
    </div>
    <div className="treatmentReasonCard"><div><b>Alasan / Dasar Pemberian Treatment *</b><span>Jelaskan pertimbangan klinis mengapa obat, pemeriksaan, atau tindakan ini diperlukan.</span></div><textarea value={treatmentReason} onChange={e=>setTreatmentReason(e.target.value)} placeholder="Contoh: berdasarkan diagnosis dan hasil pemeriksaan awal, diperlukan ..."/></div>
-   <div className="treatmentUploadCard"><div><b>Lampiran Treatment</b><span>Upload foto obat, resep, permintaan tindakan, hasil pemeriksaan, atau dokumen pendukung.</span></div><label className="uploadBtn"><Upload size={16}/>Pilih Foto / Dokumen<input type="file" multiple accept="image/*,.pdf" onChange={e=>setTreatmentAttachments(Array.from(e.target.files||[]).map(f=>f.name))}/></label>{treatmentAttachments.length>0&&<div className="attachmentList">{treatmentAttachments.map(x=><span key={x}>{x}</span>)}</div>}</div>
-   <div className="workflowActions"><span>Request ini akan masuk ke Waiting Treatment Approval.</span><button className="primary" disabled={!treatmentDiagnosis.trim()||!treatmentProcedure.trim()||!treatmentReason.trim()||!treatmentCost.trim()} onClick={submitTreatment}>Submit Treatment Request <ArrowRight size={17}/></button></div>
+   <div className="treatmentUploadCard"><CaseFilePicker title="Dokumen Pendukung Treatment" existing={selectedCase.files||[]} pending={pendingTreatmentFiles} disabled={uploadBusy} onAdd={files=>addPendingFiles("treatment",files)} onRemove={index=>removePendingFile("treatment",index)}/></div>
+   {attachmentError&&<div className="caseUploadError" role="alert">{attachmentError}</div>}
+   <div className="workflowActions"><span>Request ini akan masuk ke Waiting Treatment Approval.</span><button className="primary" disabled={uploadBusy||!treatmentDiagnosis.trim()||!treatmentProcedure.trim()||!treatmentReason.trim()||!treatmentCost.trim()} onClick={submitTreatment}>Submit Treatment Request <ArrowRight size={17}/></button></div>
   </section>}
 
   {role==="provider"&&view==="discharge"&&selectedCase&&<section className="card workflowForm">
@@ -910,30 +914,32 @@ export default function Page(){
       modalComments.map(comment=><article key={comment.id} className={"caseCommentMessage "+(comment.role===role?"own":"incoming")}>
        <div className="caseCommentMeta"><strong>{comment.author}</strong><span className={"caseCommentType "+(comment.kind==="need"?"needs":comment.kind==="reply"?"replied":"")}>{comment.kind==="need"?"Need Confirmation"+(comment.stage?" · "+comment.stage:""):comment.kind==="reply"?"Respons Provider":"Komentar"}</span><time dateTime={new Date(comment.at).toISOString()}>{new Date(comment.at).toLocaleString("id-ID")}</time></div>
        <p>{comment.text}</p>
+       {!!comment.fileIds?.length&&<div className="caseCommentAttachments">{caseFileList.filter(file=>comment.fileIds?.includes(file.id)).map(file=><button type="button" key={file.id} onClick={()=>downloadStoredAttachment(file)}><FileSpreadsheet size={14}/>{file.name}<small>{fileSizeLabel(file.size)}</small></button>)}</div>}
       </article>)}
     </div>
     <form className="caseCommentCompose" onSubmit={event=>{event.preventDefault();sendCaseComment()}}>
      <div className="caseCommentComposeTitle"><strong>{role==="callcenter"?"Komentar Call Center PertaLife":"Komentar Provider"}</strong><span>{role==="callcenter"?"Tentukan jenis pesan untuk Provider.":"Balas klarifikasi atau tambahkan catatan pelayanan."}</span></div>
      <div className="caseCommentModes" role="group" aria-label="Jenis pesan">
-      {role==="callcenter"?<>
+      {role==="callcenter"&&<>
        {confirmationStage&&<button type="button" className={commentMode==="need"?"selected":""} aria-pressed={commentMode==="need"} onClick={()=>setCommentMode("need")}>Need Confirmation · {confirmationStage}</button>}
        <button type="button" className={commentMode==="comment"?"selected":""} aria-pressed={commentMode==="comment"} onClick={()=>setCommentMode("comment")}>Komentar biasa</button>
-      </>:<>
-       {awaitingProviderResponse&&<button type="button" className={commentMode==="reply"?"selected":""} aria-pressed={commentMode==="reply"} onClick={()=>setCommentMode("reply")}>Balas Need Confirmation</button>}
-       <button type="button" className={commentMode==="comment"?"selected":""} aria-pressed={commentMode==="comment"} onClick={()=>setCommentMode("comment")}>Komentar biasa</button>
       </>}
+      {role==="provider"&&<span className="caseAutoResponse">{awaitingProviderResponse?"Balasan ini otomatis tercatat sebagai Respons Need Confirmation.":"Pesan akan tercatat sebagai Komentar Provider."}</span>}
      </div>
      <label htmlFor="case-comment-input">Isi komentar</label>
-     <textarea id="case-comment-input" rows={3} maxLength={4000} value={commentText} onChange={event=>setCommentText(event.target.value)} placeholder={commentMode==="need"?"Jelaskan dokumen atau informasi yang harus dikonfirmasi Provider...":commentMode==="reply"?"Tulis jawaban atau klarifikasi untuk Call Center...":"Tulis catatan untuk pihak lain terkait case ini..."} required/>
-     <div className="caseCommentActions"><span>Pesan menjadi history case dan ditandai sebagai komentar baru untuk pihak penerima.</span><button type="submit" className="primary" disabled={!commentText.trim()}><Send size={15}/>{commentMode==="need"&&confirmationStage?"Kirim Need Confirmation":commentMode==="reply"&&awaitingProviderResponse?"Kirim Respons":"Kirim Komentar"}</button></div>
+     <textarea id="case-comment-input" rows={3} maxLength={4000} value={commentText} onChange={event=>setCommentText(event.target.value)} placeholder={role==="provider"&&awaitingProviderResponse?"Tulis jawaban atau klarifikasi untuk Call Center...":commentMode==="need"?"Jelaskan dokumen atau informasi yang harus dikonfirmasi Provider...":"Tulis catatan untuk pihak lain terkait case ini..."} required={role==="callcenter"||pendingCommentFiles.length===0}/>
+     {role==="provider"&&<CaseFilePicker title="Lampirkan Bukti / Dokumen" existing={caseFileList} pending={pendingCommentFiles} disabled={uploadBusy} onAdd={files=>addPendingFiles("comment",files)} onRemove={index=>removePendingFile("comment",index)}/>}
+     {attachmentError&&<div className="caseUploadError" role="alert">{attachmentError}</div>}
+     <div className="caseCommentActions"><span>Pesan menjadi history case dan ditandai sebagai komentar baru untuk pihak penerima.</span><button type="submit" className="primary" disabled={uploadBusy||(!commentText.trim()&&!pendingCommentFiles.length)}><Send size={15}/>{role==="provider"&&awaitingProviderResponse?"Kirim Respons":commentMode==="need"&&confirmationStage?"Kirim Need Confirmation":"Kirim Komentar"}</button></div>
     </form>
    </section>
    <div className="caseEvidence">
-    <div className="caseSubhead"><Upload size={17}/><div><b>Lampiran Case</b><span>Dokumen/foto yang dikirim Provider pada treatment dan klaim.</span></div></div>
+    <div className="caseSubhead"><Upload size={17}/><div><b>Lampiran Case</b><span>Dokumen Admission, Treatment, dan komentar. Semua file dapat diunduh dari browser tempat file diunggah.</span></div></div>
     <div className="evidenceList">
-     {selectedCase.treatmentRequest?.attachments?.length?selectedCase.treatmentRequest.attachments.map(name=><span key={"tr-"+name}><FileSpreadsheet size={14}/>{name}<small>Treatment</small></span>):null}
+     {caseFileList.map(file=><button type="button" className="caseStoredFile" key={file.id} onClick={()=>downloadStoredAttachment(file)}><FileSpreadsheet size={15}/><span>{file.name}</span><small>{file.origin==="admission"?"Admission":file.origin==="treatment"?"Treatment":"Komentar"} · {fileSizeLabel(file.size)}</small></button>)}
+     {!caseFileList.length&&selectedCase.treatmentRequest?.attachments?.length?selectedCase.treatmentRequest.attachments.map(name=><span key={"tr-"+name}><FileSpreadsheet size={14}/>{name}<small>Treatment</small></span>):null}
      {selectedCase.claimSubmission?.documents?.filter(d=>d.fileName).map(d=><span key={"cl-"+d.label}><FileSpreadsheet size={14}/>{d.fileName}<small>{d.label}</small></span>)}
-     {!selectedCase.treatmentRequest?.attachments?.length&&!selectedCase.claimSubmission?.documents?.some(d=>d.fileName)&&<div className="emptyEvidence">Belum ada lampiran pada case ini.</div>}
+     {!caseFileList.length&&!selectedCase.treatmentRequest?.attachments?.length&&!selectedCase.claimSubmission?.documents?.some(d=>d.fileName)&&<div className="emptyEvidence">Belum ada lampiran pada case ini.</div>}
     </div>
    </div>
    <div className="caseTimeline">
