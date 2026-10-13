@@ -5,6 +5,7 @@ import {caseComments,commentReadKey,unreadCaseComments} from "./case-comments";
 import type {CaseComment,CommentKind,ConfirmationStage} from "./case-comments";
 import {downloadCaseFile,fileSizeLabel,saveCaseFiles,validateCaseFiles} from "./case-files";
 import CaseFilePicker from "./CaseFilePicker";
+import {claimTypeFromAdmission,claimTypeSummary,validateClaimFiles,CLAIM_MAX_FILES,CLAIM_MAX_BYTES} from "./claim-workflow";
 import type {CaseFileMeta} from "./case-files";
 import {Activity,AlertTriangle,ArrowRight,Building2,CheckCircle2,ChevronDown,ChevronLeft,ChevronRight,Clock3,Database,Eye,FileCheck2,FileSpreadsheet,MessageSquareText,Plus,Search,Send,Settings,ShieldCheck,Stethoscope,Trash2,Upload,UserRound,X} from "lucide-react";
 import SidebarNavigation from "./SidebarNavigation";
@@ -30,7 +31,7 @@ type ClaimSubmission={
  receiptDate:string;product:string;claimType:string;reimbursementType:string;bankName:string;
  applicantName:string;participantName:string;participantNo:string;phone:string;email:string;description:string;
  paymentMethod:string;accountNo:string;accountName:string;applicationStatus:string;submittedBy:string;receivedBy:string;
- claimProkes:boolean;submittedAt:number;documents:ClaimDocument[];bundleId?:string;bundleCaseIds?:string[];bundleTotalBill?:number;
+ claimProkes:boolean;submittedAt:number;documents:ClaimDocument[];bundleId?:string;bundleCaseIds?:string[];bundleTotalBill?:number;files?:CaseFileMeta[];
 };
 type CaseHistory={at:number;actor:string;event:string;detail?:string};
 type CareCase={id:string;name:string;memberId:string;company:string;provider:string;providerCode?:string;status:CaseStatus;urgent:boolean;submittedAt:number;issue:string;visitType:string;careLevel?:"FKTP"|"FKRTL";accessRoute?:"FKTP"|"Emergency"|"Referral";parentCaseId?:string;originReferralId?:string;specialty?:string;referral?:ReferralRequest;urgencyReason?:string;policyNo?:string;planName?:string;
@@ -225,6 +226,12 @@ export default function Page(){
  const [treatmentDiagnosis,setTreatmentDiagnosis]=useState(""),[treatmentProcedure,setTreatmentProcedure]=useState(""),[treatmentMedication,setTreatmentMedication]=useState(""),[treatmentCost,setTreatmentCost]=useState(""),[treatmentReason,setTreatmentReason]=useState("");
  const [finalDiagnosis,setFinalDiagnosis]=useState(""),[finalBill,setFinalBill]=useState(""),[dischargeNotes,setDischargeNotes]=useState("");
  const [claimDraft,setClaimDraft]=useState<ClaimSubmission|null>(null),[selectedClaimCases,setSelectedClaimCases]=useState<string[]>([]);
+ const [pendingClaimFiles,setPendingClaimFiles]=useState<File[]>([]);
+ const [claimFileError,setClaimFileError]=useState("");
+ const [expandedClaimId,setExpandedClaimId]=useState<string|null>(null);
+ const [medicalModal,setMedicalModal]=useState<{caseId:string;stage:"Treatment"|"Discharge"}|null>(null);
+ const [medicalDoctor,setMedicalDoctor]=useState("");
+ const [medicalNote,setMedicalNote]=useState("");
  const [providerProfiles,setProviderProfiles]=useState<Record<string,ProviderProfile>>(defaultProviderProfiles),[profileDraft,setProfileDraft]=useState<ProviderProfile|null>(null),[bankSearch,setBankSearch]=useState(""),[bankOpen,setBankOpen]=useState(false);
  const [uploadReview,setUploadReview]=useState<UploadReview|null>(null); const [reviewFilter,setReviewFilter]=useState("all"); const [memberPage,setMemberPage]=useState(1); const [memberPageSize,setMemberPageSize]=useState(50);
 
@@ -303,6 +310,17 @@ export default function Page(){
   if(role==="provider"&&view==="cases")return true;
   return true;
  });
+ const providerSubmissions=useMemo(()=>{
+  const registry=new Map<string,{id:string;submission:ClaimSubmission;cases:CareCase[]}>();
+  for(const c of cases){
+   if(!c.claimSubmission)continue;
+   const id=c.claimSubmission.bundleId||"CLAIM-"+c.id;
+   const item=registry.get(id);
+   if(item)item.cases.push(c);
+   else registry.set(id,{id,submission:c.claimSubmission,cases:[c]});
+  }
+  return Array.from(registry.values()).filter(item=>role==="callcenter"||item.cases.some(c=>c.providerCode===activeProvider.code||c.provider===activeProvider.name)).sort((a,b)=>b.submission.submittedAt-a.submission.submittedAt);
+ },[cases,role,activeProvider.code,activeProvider.name]);
  const selectedCase=selectedCaseId?cases.find(c=>c.id===selectedCaseId)||null:null;
  const selectedHistory=selectedCase?(selectedCase.history?.length?selectedCase.history:fallbackHistory(selectedCase)):[];
  const modalComments=selectedCase?caseComments(selectedCase):[];
@@ -611,7 +629,7 @@ export default function Page(){
  }
  function openProviderProfile(){
   const profile=providerProfiles[activeProvider.code]||defaultProviderProfiles[activeProvider.code];
-  setProfileDraft({...profile,providerCode:activeProvider.code,providerName:activeProvider.name});
+  setProfileDraft({...profile,paymentMethod:"Transfer",providerCode:activeProvider.code,providerName:activeProvider.name});
   setBankSearch(profile.bankName||"");setBankOpen(false);setView("profile");setNotice("");
  }
  function saveProviderProfile(){
@@ -619,7 +637,7 @@ export default function Page(){
   if(!profileDraft.providerName.trim()){setNotice("Nama Provider tidak boleh kosong.");return}
   if(profileDraft.bankName&&!bankOptions.some(b=>b.name===profileDraft.bankName)){setNotice("Nama bank wajib dipilih dari daftar bank yang tersedia.");return}
   if(bankSearch.trim()&&!profileDraft.bankName){setNotice("Pilih nama bank dari hasil pencarian, jangan hanya mengetik nama bank.");return}
-  const saved={...profileDraft,providerCode:activeProvider.code,providerName:activeProvider.name,updatedAt:Date.now()};
+  const saved={...profileDraft,paymentMethod:"Transfer",providerCode:activeProvider.code,providerName:activeProvider.name,updatedAt:Date.now()};
   setProviderProfiles(v=>({...v,[activeProvider.code]:saved}));
   setProfileDraft(saved);setBankSearch(saved.bankName||"");setBankOpen(false);
   setNotice("Profile "+activeProvider.name+" berhasil disimpan.");
@@ -746,7 +764,7 @@ export default function Page(){
    <div className="profileSection bankProfile">
     <div className="profileSectionTitle"><FileSpreadsheet size={18}/><div><b>Data Rekening Pembayaran</b><span>Akan otomatis terisi saat Provider membuat single claim maupun bundle claim.</span></div></div>
     <div className="profileGrid">
-     <label>Metode Pembayaran<select value={profileDraft.paymentMethod} onChange={e=>setProfileDraft({...profileDraft,paymentMethod:e.target.value})}><option>Transfer</option><option>Giro</option></select></label>
+     <label>Metode Pembayaran<input value="Transfer" readOnly aria-label="Metode pembayaran hanya Transfer"/></label>
      <label>Nama Bank<div className="bankCombobox"><div className="bankSearchInput"><Search size={15}/><input value={bankSearch} onFocus={()=>setBankOpen(true)} onChange={e=>{setBankSearch(e.target.value);setProfileDraft({...profileDraft,bankName:""});setBankOpen(true)}} placeholder="Cari nama bank / kode bank..."/><ChevronDown size={15}/></div>{bankOpen&&<div className="bankDropdown">{filteredBanks.length===0?<div className="bankEmpty">Bank tidak ditemukan</div>:filteredBanks.map(b=><button type="button" key={b.code+"-"+b.name} onMouseDown={e=>e.preventDefault()} onClick={()=>{setProfileDraft({...profileDraft,bankName:b.name});setBankSearch(b.name);setBankOpen(false)}}><span>{b.name}</span><small>Kode {b.code}</small></button>)}</div>}</div>{profileDraft.bankName&&<small className="bankSelected">Terpilih: {profileDraft.bankName}</small>}</label>
      <label>No. Rekening<input inputMode="numeric" value={profileDraft.accountNo} onChange={e=>setProfileDraft({...profileDraft,accountNo:e.target.value.replace(/\D/g,"")})} placeholder="Nomor rekening"/></label>
      <label>Atas Nama Rekening<input value={profileDraft.accountName} onChange={e=>setProfileDraft({...profileDraft,accountName:e.target.value})} placeholder="Nama pemilik rekening"/></label>
