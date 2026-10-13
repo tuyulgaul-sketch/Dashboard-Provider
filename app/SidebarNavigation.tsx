@@ -17,7 +17,7 @@ const providerGroups:Group[]=[
  ]},
  {key:"finance",label:"Klaim & Riwayat",icon:FileSpreadsheet,items:[
   {label:"Riwayat Discharge",view:"history",icon:Clock3},
-  {label:"Pengajuan Klaim",view:"claim",route:"history",icon:FileSpreadsheet}
+  {label:"Pengajuan Klaim",view:"claim-list",icon:FileSpreadsheet}
  ]},
  {key:"settings",label:"Pengaturan",icon:Settings,items:[
   {label:"Profile Provider",view:"profile",icon:Building2,profile:true}
