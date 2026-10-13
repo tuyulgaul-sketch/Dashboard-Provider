@@ -1,6 +1,8 @@
 "use client";
 import {useEffect,useMemo,useRef,useState} from "react";
 import {createPortal} from "react-dom";
+import {caseComments,commentReadKey,unreadCaseComments} from "./case-comments";
+import type {CaseComment,CommentKind,ConfirmationStage} from "./case-comments";
 import {Activity,AlertTriangle,ArrowRight,Building2,CheckCircle2,ChevronDown,ChevronLeft,ChevronRight,Clock3,Database,Eye,FileCheck2,FileSpreadsheet,Plus,Search,Settings,ShieldCheck,Stethoscope,Trash2,Upload,UserRound,X} from "lucide-react";
 import SidebarNavigation from "./SidebarNavigation";
 import BenefitCoverage from "./BenefitCoverage";
@@ -34,6 +36,7 @@ type CareCase={id:string;name:string;memberId:string;company:string;provider:str
  dischargeRequest?:{finalDiagnosis:string;finalBill:number;notes:string;submittedAt:number};
  dischargeApproval?:{doctor:string;note:string;approvedAt:number};
  confirmation?:{stage:"Admission"|"Treatment"|"Discharge";reason:string;requestedAt:number;response?:string;respondedAt?:number};
+ comments?:CaseComment[];
  billing?:{status:"Submitted"|"Under Verification"|"Approved"|"Scheduled for Payment"|"Paid";submittedAt:number;updatedAt:number;reminderCount:number;lastReminderAt?:number};
  claimSubmission?:ClaimSubmission;
  demo?:boolean;
@@ -206,6 +209,10 @@ export default function Page(){
  const [selectedCaseId,setSelectedCaseId]=useState<string|null>(null),[showCaseDetail,setShowCaseDetail]=useState(false);
  const caseDetailCloseRef=useRef<HTMLButtonElement|null>(null);
  const caseDetailReturnFocusRef=useRef<HTMLElement|null>(null);
+ const caseDetailDialogRef=useRef<HTMLElement|null>(null);
+ const [commentText,setCommentText]=useState("");
+ const [commentMode,setCommentMode]=useState<CommentKind>("comment");
+ const [commentReadAt,setCommentReadAt]=useState<Record<string,number>>({});
  const [treatmentDiagnosis,setTreatmentDiagnosis]=useState(""),[treatmentProcedure,setTreatmentProcedure]=useState(""),[treatmentMedication,setTreatmentMedication]=useState(""),[treatmentCost,setTreatmentCost]=useState(""),[treatmentReason,setTreatmentReason]=useState(""),[treatmentAttachments,setTreatmentAttachments]=useState<string[]>([]);
  const [finalDiagnosis,setFinalDiagnosis]=useState(""),[finalBill,setFinalBill]=useState(""),[dischargeNotes,setDischargeNotes]=useState("");
  const [claimDraft,setClaimDraft]=useState<ClaimSubmission|null>(null),[selectedClaimCases,setSelectedClaimCases]=useState<string[]>([]);
@@ -216,6 +223,20 @@ export default function Page(){
  useEffect(()=>{if(hydrated)localStorage.setItem("pertalife-managed-care-members-v2",JSON.stringify(members));},[members,hydrated]);
  useEffect(()=>{if(hydrated)localStorage.setItem("pertalife-managed-care-cases",JSON.stringify(cases));},[cases,hydrated]);
  useEffect(()=>{if(hydrated)localStorage.setItem("pertalife-managed-care-provider-profiles",JSON.stringify(providerProfiles));},[providerProfiles,hydrated]);
+ useEffect(()=>{try{const v=localStorage.getItem("pertalife-managed-care-comment-read-v1");if(v)setCommentReadAt(JSON.parse(v));}catch{}},[]);
+ useEffect(()=>{if(hydrated)localStorage.setItem("pertalife-managed-care-comment-read-v1",JSON.stringify(commentReadAt));},[commentReadAt,hydrated]);
+ // Prototype: live updates across tabs of the same browser and origin.
+ useEffect(()=>{
+  const onStorage=(event:StorageEvent)=>{
+   if(event.storageArea!==localStorage||!event.newValue)return;
+   try{
+    if(event.key==="pertalife-managed-care-cases")setCases(JSON.parse(event.newValue));
+    if(event.key==="pertalife-managed-care-comment-read-v1")setCommentReadAt(JSON.parse(event.newValue));
+   }catch{}
+  };
+  window.addEventListener("storage",onStorage);
+  return()=>window.removeEventListener("storage",onStorage);
+ },[]);
 
  useEffect(()=>{
   if(!showCaseDetail)return;
@@ -243,6 +264,14 @@ export default function Page(){
  const visibleCases=useMemo(()=>role==="provider"?cases.filter(c=>c.providerCode===activeProvider.code||(!c.providerCode&&c.provider===activeProvider.name)):cases,[cases,role,activeProvider.code,activeProvider.name]);
  const waiting=useMemo(()=>visibleCases.filter(c=>c.status.startsWith("Waiting")),[visibleCases]);
  const demoCount=cases.filter(c=>c.demo).length;
+ const viewerAccount=role==="callcenter"?"callcenter":activeProvider.code;
+ const unreadByCase=useMemo(()=>{
+  const counts:Record<string,number>={};
+  for(const c of cases)counts[c.id]=unreadCaseComments(c,role,commentReadAt[commentReadKey(c.id,viewerAccount)]||0);
+  return counts;
+ },[cases,role,viewerAccount,commentReadAt]);
+ const unreadTotal=visibleCases.reduce((sum,c)=>sum+(unreadByCase[c.id]||0),0);
+ const unreadFor=(id:string)=>unreadByCase[id]||0;
  const approvedFKRTLCases=useMemo(()=>visibleCases
   .filter(c=>c.careLevel==="FKRTL"&&c.accessRoute==="Referral"&&!!c.originReferralId)
   .sort((a,b)=>b.submittedAt-a.submittedAt),[visibleCases]);
@@ -267,6 +296,19 @@ export default function Page(){
  });
  const selectedCase=selectedCaseId?cases.find(c=>c.id===selectedCaseId)||null:null;
  const selectedHistory=selectedCase?(selectedCase.history?.length?selectedCase.history:fallbackHistory(selectedCase)):[];
+ const modalComments=selectedCase?caseComments(selectedCase):[];
+ const awaitingProviderResponse=!!selectedCase?.confirmation&&!selectedCase.confirmation.respondedAt;
+ const confirmationStage:ConfirmationStage|null=selectedCase?.status==="Waiting Admission"?"Admission":
+  selectedCase?.status==="Waiting Treatment Approval"?"Treatment":
+  selectedCase?.status==="Waiting Discharge"?"Discharge":null;
+ useEffect(()=>{
+  if(!hydrated||!showCaseDetail||!selectedCaseId)return;
+  const current=cases.find(c=>c.id===selectedCaseId);if(!current)return;
+  const lastReceived=caseComments(current).filter(m=>m.role!==role).reduce((max,m)=>Math.max(max,m.at),0);
+  if(!lastReceived)return;
+  const key=commentReadKey(selectedCaseId,role==="callcenter"?"callcenter":activeProviderCode);
+  setCommentReadAt(prev=>lastReceived>(prev[key]||0)?{...prev,[key]:lastReceived}:prev);
+ },[hydrated,showCaseDetail,selectedCaseId,cases,role,activeProviderCode]);
  const referralMember=selectedCase?.referral?members.find(m=>m.cardNo.toLowerCase()===selectedCase.memberId.toLowerCase()):null;
  const dischargeHistory=useMemo(()=>visibleCases.filter(c=>!!c.dischargeRequest).sort((a,b)=>(b.dischargeRequest?.submittedAt||0)-(a.dischargeRequest?.submittedAt||0)),[visibleCases]);
  const filteredMembers=useMemo(()=>members.filter(m=>(m.cardNo+" "+m.name+" "+m.membershipNo+" "+m.employeeName+" "+m.employeeMembershipNo+" "+m.company+" "+m.department+" "+m.policyNo).toLowerCase().includes(memberQuery.toLowerCase())),[members,memberQuery]);
