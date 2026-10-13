@@ -202,3 +202,46 @@
 .claimReviewAttachments {padding:17px;margin:18px;border:1px solid #dbe7f4;border-radius:12px;background:#f9fcff;}
 @media(max-width:800px){.claimRegistryEntryHead {gap:7px;flex-wrap:wrap;}.claimRegistryId {flex-basis:100%;}.claimRegistryStats {margin:12px;}.claimRegistryEntries {margin:12px;}}
 @media(max-width:560px){.medicalApprovalHeading {padding:16px;}.medicalApprovalForm {padding:16px;}.medicalApprovalActions {flex-wrap:wrap;}.medicalApprovalActions button {flex:1;justify-content:center;}.claimRegistryEntryHead {padding:12px;}.claimBulkQuota {flex-direction:column;align-items:flex-start;}.claimBulkFileRow {flex-wrap:wrap;}.claimBulkFileRow button {margin-left:auto;}}
+
+/* Provider Discharge: final bill must be supported by receipt/invoice details. */
+.dischargeBillEvidence {display:flex;flex-direction:column;gap:12px;margin:18px 20px;padding:16px 18px;background:#f8fbff;border:1px solid #d3e3f3;border-radius:13px;min-width:0;}
+.dischargeBillHead {display:flex;align-items:flex-start;gap:11px;color:#276393;}
+.dischargeBillHead svg {flex-shrink:0;margin-top:3px;}
+.dischargeBillHead>div {min-width:0;}
+.dischargeBillHead strong {display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:13px;color:#234669;}
+.dischargeBillHead p {margin:5px 0 0;font-size:11px;color:#72839b;line-height:1.6;}
+.dischargeRequiredTag {display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;background:#fce9eb;color:#b82948;font-size:9px;font-weight:850;}
+.dischargeBillAmount {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;background:#fff;border:1px solid #e0e9f3;border-radius:10px;}
+.dischargeBillAmount span {font-size:11px;color:#5b7696;}
+.dischargeBillAmount strong {font-size:16px;color:#1d507f;white-space:nowrap;}
+.dischargeBillEvidence>.caseFilePicker {margin:0;}
+.dischargeBillHint {font-size:11px;color:#a2692f;line-height:1.6;}
+/* Call Center Discharge: evidence is visible in the medical decision dialog. */
+.medicalBillReview {display:flex;flex-direction:column;gap:11px;border:1px solid #d2e1f1;background:#f6fbff;border-radius:13px;padding:13px;}
+.medicalBillReviewHead {display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+.medicalBillReviewHead>div {display:flex;flex-direction:column;gap:4px;min-width:0;}
+.medicalBillReviewHead strong {font-size:13px;color:#23476e;}
+.medicalBillReviewHead small {font-size:11px;font-weight:450;color:#71849b;line-height:1.55;}
+.medicalEvidenceReady,.medicalEvidenceMissing {font-size:10px;font-weight:800;white-space:nowrap;border-radius:999px;padding:5px 8px;}
+.medicalEvidenceReady {background:#e5f6ec;color:#1c7550;}
+.medicalEvidenceMissing {background:#fff0e5;color:#aa6533;}
+.medicalBillValues {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.medicalBillValues>div {background:white;padding:10px;border:1px solid #deebf5;border-radius:9px;min-width:0;display:flex;flex-direction:column;gap:4px;}
+.medicalBillValues span {font-size:10px;color:#7789a0;}
+.medicalBillValues strong {font-size:12px;color:#22496d;overflow-wrap:anywhere;}
+.medicalBillAttachments {display:flex;flex-direction:column;gap:7px;max-height:180px;overflow-y:auto;}
+.medicalBillAttachments button {display:flex;gap:8px;align-items:center;padding:10px 11px;border:1px solid #cadfee;background:white;border-radius:9px;color:#235a89;cursor:pointer;}
+.medicalBillAttachments button span {flex:1;min-width:0;font-size:11px;font-weight:750;overflow-wrap:anywhere;text-align:left;}
+.medicalBillAttachments button small {font-size:10px;color:#6f89a1;white-space:nowrap;}
+.medicalBillAttachments button:hover {background:#eff7ff;border-color:#8bb6df;}
+.medicalBillConfirm {display:flex!important;flex-direction:row!important;gap:9px!important;align-items:flex-start!important;padding:11px 12px;background:#eaf5ff;border:1px solid #bad8ef;border-radius:9px;font-size:11px!important;color:#2b547c!important;line-height:1.5;}
+.medicalBillConfirm input {width:16px!important;height:16px;flex-shrink:0;margin:0!important;cursor:pointer;}
+.medicalBillConfirm span {font-weight:750;}
+.medicalBillMissingNote {margin:0;font-size:11px;color:#9c633a;line-height:1.5;}
+@media(max-width:600px){
+ .dischargeBillEvidence {margin:12px;padding:12px;}
+ .dischargeBillAmount {align-items:flex-start;flex-direction:column;}
+ .medicalBillValues {grid-template-columns:1fr;}
+ .medicalBillReviewHead {flex-wrap:wrap;}
+ .medicalBillAttachments button {flex-wrap:wrap;}
+}
