@@ -1,0 +1,59 @@
+/* Inpatient pathway — Provider PDF e-form and patient-discharge cost ledger */
+.inpatientCard {overflow:hidden;}
+.inpatientEform {padding:20px 24px 25px;display:flex;flex-direction:column;gap:14px;}
+.inpatientEform h3 {font-size:13px;font-weight:850;color:#23486d;margin:11px 0 0;padding-bottom:9px;border-bottom:1px solid #e1eaf4;}
+.inpatientIdentity,.inpatientAuditGrid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+.inpatientIdentity>div,.inpatientAuditGrid>div {display:flex;flex-direction:column;gap:6px;padding:12px 13px;border-radius:10px;border:1px solid #e0eaf5;background:#f8fbff;min-width:0;}
+.inpatientIdentity span,.inpatientAuditGrid span {font-size:10px;color:#7488a1;font-weight:650;}
+.inpatientIdentity strong,.inpatientAuditGrid strong {font-size:12px;color:#27466a;line-height:1.55;overflow-wrap:anywhere;white-space:pre-wrap;}
+.inpatientFields {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+.inpatientField {display:flex;flex-direction:column;gap:7px;font-size:11px;font-weight:800;color:#395b7a;min-width:0;}
+.inpatientField.full {grid-column:1/-1;}
+.inpatientField em {color:#c1233c;font-style:normal;}
+.inpatientField input,.inpatientField textarea,.inpatientField select {box-sizing:border-box;width:100%;padding:11px 12px;font-size:12px;font-weight:450;color:#1e395b;border:1px solid #ccdded;border-radius:10px;background:white;resize:vertical;font-family:inherit;min-height:41px;}
+.inpatientField input:focus-visible,.inpatientField select:focus-visible,.inpatientField textarea:focus-visible {outline:3px solid #acd3f7;outline-offset:1px;}
+.inpatientField input[readonly] {background:#edf2f8;color:#637d97;}
+.inpatientConditions {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;}
+.inpatientConditions label {display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid #e0eaf4;padding:10px 12px;border-radius:9px;color:#345672;font-size:11px;background:#fff;}
+.inpatientConditions select {border:1px solid #ccdae8;border-radius:7px;background:white;color:#315572;padding:7px;font-size:11px;min-width:98px;}
+.inpatientNote {border-radius:10px;background:#f0f6fc;border:1px solid #dfebf5;color:#536d85;padding:11px 13px;font-size:11px;font-weight:450;line-height:1.7;margin:0;}
+.inpatientActions {display:flex;justify-content:flex-end;padding-top:11px;}
+.inpatientBillTable {width:100%;overflow-x:auto;overscroll-behavior-x:contain;border:1px solid #dfe9f4;border-radius:11px;}
+.inpatientBillTable table {width:100%;border-collapse:collapse;min-width:670px;}
+.inpatientBillTable th {text-align:left;background:#f1f6fc;padding:12px;color:#5c7791;font-size:10px;font-weight:850;}
+.inpatientBillTable td {padding:10px 11px;color:#2c4a6a;font-size:11px;border-top:1px solid #e8eff7;vertical-align:middle;}
+.inpatientBillTable td:not(:first-child) {white-space:nowrap;}
+.inpatientBillTable td:first-child {font-weight:700;min-width:190px;}
+.inpatientBillTable input {width:150px;padding:9px;border:1px solid #ccdaec;border-radius:8px;font-size:11px;background:white;color:#2f5070;box-sizing:border-box;}
+.inpatientBillTotal {background:#ebf5ff;font-weight:850;}
+.inpatientBillTotal td {color:#164d85;font-weight:850;}
+.inpatientLockedCell {font-size:10px!important;color:#8595a5!important;font-style:italic;}
+.inpatientDuration {display:flex;gap:6px;align-items:center;font-size:11px;color:#4c7091;}
+.inpatientRequiredReceipt {padding:15px;border-radius:11px;background:#f8fbff;border:1px solid #dce8f6;}
+.inpatientRequiredReceipt h3 {margin:0 0 7px!important;}
+.inpatientRequiredReceipt>p {font-size:11px;color:#6d8499;line-height:1.5;}
+.inpatientReviewDialog,.inpatientExtendDialog {width:min(980px,96vw);max-height:calc(100dvh - 30px);overflow-y:auto;border-radius:18px;margin:0;background:white;box-shadow:0 20px 75px #1f395855;}
+.inpatientExtendDialog {max-width:600px;}
+.inpatientReviewBody {padding:20px 24px;display:flex;flex-direction:column;gap:14px;}
+.inpatientReviewSummary {display:flex;flex-wrap:wrap;gap:8px;}
+.inpatientReviewSummary span,.inpatientReviewSummary strong {font-size:11px;background:#f4f9ff;color:#315c82;border:1px solid #dceaf7;border-radius:8px;padding:9px 11px;}
+.inpatientReviewBody .inpatientField {width:100%;}
+.inpatientActivePill {display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:750;padding:7px 9px;border:1px solid #bbdec9;background:#edf8f0;color:#23764a;border-radius:9px;line-height:1.5;}
+.caseInpatientHistory {margin:16px 22px;border:1px solid #d3e3f0;background:#fcfeff;border-radius:13px;overflow:hidden;}
+.caseInpatientHistory>.inpatientAuditGrid,.caseInpatientHistory>.inpatientFormDetails,.caseInpatientHistory>.inpatientExtensionsAudit,.caseInpatientHistory>.inpatientBillAudit {margin:14px;}
+.caseInpatientHistory .caseSubhead {background:#f2f8fd;}
+.inpatientFormDetails {border-radius:9px;background:#f4f8fc;border:1px solid #dceaf5;padding:13px;}
+.inpatientFormDetails summary {font-size:12px;color:#205b91;font-weight:800;cursor:pointer;}
+.inpatientFormDetails .inpatientAuditGrid {margin-top:12px;}
+.inpatientExtensionsAudit h4,.inpatientBillAudit h4 {font-size:12px;color:#255b88;margin:15px 0 9px;}
+.inpatientExtensionsAudit>div {display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-bottom:1px solid #dce9f4;flex-wrap:wrap;font-size:11px;color:#496780;}
+.inpatientExtensionsAudit b {font-size:10px;color:#235e93;}
+.inpatientBillAudit .inpatientBillTable {margin-top:12px;}
+@media(max-width:850px){.inpatientIdentity,.inpatientAuditGrid {grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:620px){
+ .inpatientEform,.inpatientReviewBody {padding:13px;}
+ .inpatientFields,.inpatientConditions,.inpatientIdentity,.inpatientAuditGrid {grid-template-columns:1fr;}
+ .caseInpatientHistory {margin:12px;}
+ .inpatientActions button {width:100%;justify-content:center;}
+ .inpatientReviewDialog {width:100%;max-height:calc(100dvh - 16px);border-radius:13px;}
+}
