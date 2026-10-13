@@ -1,6 +1,8 @@
 "use client";
 import {useState} from "react";
-import {BedDouble,CheckCircle2,Clock3,FileSpreadsheet,ShieldCheck,X} from "lucide-react";
+import {BedDouble,Clock3,FileSpreadsheet,ShieldCheck,X} from "lucide-react";
+import {fileSizeLabel} from "./case-files";
+import type {CaseFileMeta} from "./case-files";
 import {
  blankInpatientForm,blankInpatientBilling,CONDITION_LABELS,INPATIENT_COST_CATEGORIES,
  totalSubmitted,totalApproved,withComputedExcess,validateInpatientRequest,dateOffset
@@ -131,8 +133,9 @@ export function InpatientBillingForm({patient,episode,onSubmit,onCancel,uploadSl
  </section>;
 }
 type ReviewMode="admission"|"extension"|"billing";
-export function InpatientReviewModal({mode,episode,patient,onClose,onDecision}:{
+export function InpatientReviewModal({mode,episode,patient,onClose,onDecision,files=[],onDownload}:{
  mode:ReviewMode;episode:InpatientEpisode;patient:Patient;onClose:()=>void;
+ files?:CaseFileMeta[];onDownload?:(file:CaseFileMeta)=>void;
  onDecision:(review:{doctor:string;days:number;note:string;approvedCosts?:number[];nonCoveredExplanation?:string;bufferNotes?:string})=>void;
 }){
  const [doctor,setDoctor]=useState("");
@@ -141,6 +144,7 @@ export function InpatientReviewModal({mode,episode,patient,onClose,onDecision}:{
  const [approved,setApproved]=useState<number[]>(episode.billing?.lines.map(line=>line.submitted)||[]);
  const [nonCovered,setNonCovered]=useState("");
  const [bufferNotes,setBufferNotes]=useState("");
+ const [billingEvidenceReviewed,setBillingEvidenceReviewed]=useState(false);
  const [error,setError]=useState("");
  const pending=episode.extensions.findLast(x=>x.status==="Pending");
  const billing=episode.billing;
@@ -150,6 +154,8 @@ export function InpatientReviewModal({mode,episode,patient,onClose,onDecision}:{
   e.preventDefault();
   if(!doctor.trim()||!note.trim()){setError("Nama dokter dan catatan persetujuan/pertimbangan wajib diisi.");return;}
   if(mode!=="billing"&&(!Number.isInteger(days)||days<1||days>180)){setError("Jumlah hari persetujuan harus 1–180 hari.");return;}
+  if(mode==="billing"&&!files.length){setError("Tidak ada bukti tagihan. Minta dokumen kepada Provider melalui Diskusi / Need Confirmation.");return;}
+  if(mode==="billing"&&!billingEvidenceReviewed){setError("Konfirmasi bahwa bukti tagihan dan perincian biaya telah diperiksa.");return;}
   if(mode==="billing"&&billing&&(approved.some((v,i)=>!Number.isFinite(v)||v<0||v>billing.lines[i].submitted))){
    setError("Biaya yang disetujui tidak boleh melebihi biaya diajukan dan tidak boleh negatif.");return;
   }
@@ -164,6 +170,12 @@ export function InpatientReviewModal({mode,episode,patient,onClose,onDecision}:{
     {mode==="extension"&&<div className="inpatientReviewSummary"><span>Alasan Extend: {pending?.reason||"-"}</span><span>Tanggal Akhir Jaminan Saat Ini: {episode.extensions.filter(x=>x.status==="Approved").at(-1)?.endDate||episode.approval?.endDate||"-"}</span></div>}
     {mode==="billing"&&billing&&<>
      <div className="inpatientReviewSummary"><span>Diagnosis Akhir: {billing.finalDiagnosis}</span><span>Periode: {episode.request.admissionDate} s.d. {billing.exitDate}</span><strong>Tagihan Provider: {rupiah(total)}</strong></div>
+     <div className="inpatientBillReviewFiles">
+      <strong>Bukti Tagihan / Rincian Biaya ({files.length} dokumen)</strong>
+      {files.map(file=><button type="button" key={file.id} onClick={()=>onDownload?.(file)}><FileSpreadsheet size={15}/><span>{file.name}</span><small>{fileSizeLabel(file.size)}</small></button>)}
+      {!files.length&&<span className="inpatientNote">Belum ada lampiran. Periksa kelengkapan sebelum approval.</span>}
+      <label><input type="checkbox" checked={billingEvidenceReviewed} onChange={e=>setBillingEvidenceReviewed(e.target.checked)}/><span>Saya telah memeriksa dokumen tagihan dan kesesuaian rincian biaya.</span></label>
+     </div>
      <div className="inpatientBillTable"><table><thead><tr><th>Manfaat</th><th>Diajukan</th><th>Disetujui (input PertaLife)</th><th>Tidak Dijaminkan (otomatis)</th></tr></thead><tbody>
       {billing.lines.map((line,i)=><tr key={line.category}><td>{line.category}</td><td>{rupiah(line.submitted)}</td><td><input type="number" min={0} max={line.submitted} value={approved[i]??0} aria-label={"Biaya disetujui "+line.category} onChange={e=>setApproved(v=>v.map((x,j)=>j===i?Number(e.target.value):x))}/></td><td>{rupiah(Math.max(0,line.submitted-(approved[i]||0)))}</td></tr>)}
       <tr className="inpatientBillTotal"><td>TOTAL</td><td>{rupiah(total)}</td><td>{rupiah(approvedTotal)}</td><td>{rupiah(Math.max(0,total-approvedTotal))}</td></tr>
