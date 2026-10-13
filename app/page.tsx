@@ -5,6 +5,9 @@ import {caseComments,commentReadKey,unreadCaseComments} from "./case-comments";
 import type {CaseComment,CommentKind,ConfirmationStage} from "./case-comments";
 import {downloadCaseFile,fileSizeLabel,saveCaseFiles,validateCaseFiles} from "./case-files";
 import CaseFilePicker from "./CaseFilePicker";
+import {InpatientRequestForm,InpatientBillingForm,InpatientReviewModal} from "./InpatientPanels";
+import {isHospitalEligible,isoToday,dateOffset,isExtensionWindow,totalSubmitted,withComputedExcess} from "./inpatient-model";
+import type {InpatientEpisode,InpatientForm,InpatientBilling} from "./inpatient-model";
 import {claimTypeFromAdmission,claimTypeSummary,validateClaimFiles,CLAIM_MAX_FILES,CLAIM_MAX_BYTES} from "./claim-workflow";
 import type {CaseFileMeta} from "./case-files";
 import {Activity,AlertTriangle,ArrowRight,Building2,CheckCircle2,ChevronDown,ChevronLeft,ChevronRight,Clock3,Database,Eye,FileCheck2,FileSpreadsheet,MessageSquareText,Plus,Search,Send,Settings,ShieldCheck,Stethoscope,Trash2,Upload,UserRound,X} from "lucide-react";
@@ -15,7 +18,7 @@ import {makeProviderDemoCases} from "../lib/demo-transactions";
 import type {ReferralDraft,ReferralRequest,ReferralStatus} from "./ReferralPanels";
 
 type Role="provider"|"callcenter";
-type CaseStatus="Waiting Admission"|"Treatment Active"|"Waiting Treatment Approval"|"Treatment Approved"|"Waiting Discharge"|"Closed";
+type CaseStatus="Waiting Admission"|"Treatment Active"|"Waiting Treatment Approval"|"Treatment Approved"|"Waiting Discharge"|"Closed"|"Waiting Inpatient Approval"|"Inpatient Active"|"Waiting Inpatient Extension"|"Waiting Inpatient Discharge";
 type Member={
  policyNo:string;company:string;department:string;startDate:string;endDate:string;
  membershipNo:string;name:string;employeeName:string;employeeMembershipNo:string;dob:string;
@@ -42,6 +45,7 @@ type CareCase={id:string;name:string;memberId:string;company:string;provider:str
  confirmation?:{stage:"Admission"|"Treatment"|"Discharge";reason:string;requestedAt:number;response?:string;respondedAt?:number};
  comments?:CaseComment[];
  files?:CaseFileMeta[];
+ inpatient?:InpatientEpisode;
  billing?:{status:"Submitted"|"Under Verification"|"Approved"|"Scheduled for Payment"|"Paid";submittedAt:number;updatedAt:number;reminderCount:number;lastReminderAt?:number};
  claimSubmission?:ClaimSubmission;
  demo?:boolean;
@@ -234,6 +238,9 @@ export default function Page(){
  const [medicalDoctor,setMedicalDoctor]=useState("");
  const [medicalNote,setMedicalNote]=useState("");
  const [dischargeEvidenceReviewed,setDischargeEvidenceReviewed]=useState(false);
+ const [inpatientReview,setInpatientReview]=useState<{caseId:string;mode:"admission"|"extension"|"billing"}|null>(null);
+ const [extendCaseId,setExtendCaseId]=useState<string|null>(null);
+ const [extendReason,setExtendReason]=useState("");
  const [providerProfiles,setProviderProfiles]=useState<Record<string,ProviderProfile>>(defaultProviderProfiles),[profileDraft,setProfileDraft]=useState<ProviderProfile|null>(null),[bankSearch,setBankSearch]=useState(""),[bankOpen,setBankOpen]=useState(false);
  const [uploadReview,setUploadReview]=useState<UploadReview|null>(null); const [reviewFilter,setReviewFilter]=useState("all"); const [memberPage,setMemberPage]=useState(1); const [memberPageSize,setMemberPageSize]=useState(50);
 
@@ -308,7 +315,7 @@ export default function Page(){
   if(statusFilter)return c.status===statusFilter;
   if(role==="provider"&&view==="registration")return c.status==="Waiting Admission";
   if(role==="provider"&&view==="treatment")return ["Treatment Active","Waiting Treatment Approval","Treatment Approved"].includes(c.status);
-  if(role==="provider"&&view==="discharge")return ["Treatment Approved","Waiting Discharge"].includes(c.status);
+  if(role==="provider"&&view==="discharge")return ["Treatment Approved","Waiting Discharge","Inpatient Active","Waiting Inpatient Extension","Waiting Inpatient Discharge"].includes(c.status);
   if(role==="provider"&&view==="cases")return true;
   return true;
  });
