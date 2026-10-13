@@ -916,10 +916,10 @@ export default function Page(){
    <div className="claimGrid">
     <label>Tanggal Penerimaan<input type="date" value={claimDraft.receiptDate} onChange={e=>setClaimDraft({...claimDraft,receiptDate:e.target.value})}/></label>
     <label>Produk<input value={claimDraft.product} onChange={e=>setClaimDraft({...claimDraft,product:e.target.value})}/></label>
-    <label>Jenis Klaim<select value={claimDraft.claimType} onChange={e=>setClaimDraft({...claimDraft,claimType:e.target.value})}><option>Rumah Sakit</option><option>Klinik</option><option>Rawat Jalan</option><option>Rawat Inap</option><option>UGD / IGD</option><option>Emergency Gigi</option></select></label>
+    <label>Jenis Klaim (mengikuti Admission)<input value={claimTypeSummary(cases.filter(c=>claimDraft.bundleCaseIds?.includes(c.id)))} readOnly title="Jenis pelayanan mengikuti Admission setiap case"/></label>
     <label>Jenis Reimbursement<input value={claimDraft.reimbursementType} onChange={e=>setClaimDraft({...claimDraft,reimbursementType:e.target.value})} placeholder="Opsional"/></label>
     <label>Nama Bank *<input value={claimDraft.bankName} onChange={e=>setClaimDraft({...claimDraft,bankName:e.target.value})} placeholder="Contoh Bank Mandiri"/></label>
-    <label>Metode Pembayaran<select value={claimDraft.paymentMethod} onChange={e=>setClaimDraft({...claimDraft,paymentMethod:e.target.value})}><option>Transfer</option><option>Giro</option></select></label>
+    <label>Metode Pembayaran<input value="Transfer" readOnly aria-label="Metode pembayaran Transfer"/></label>
     <label>No. Rekening *<input value={claimDraft.accountNo} onChange={e=>setClaimDraft({...claimDraft,accountNo:e.target.value.replace(/\D/g,"")})} inputMode="numeric"/></label>
     <label>Atas Nama *<input value={claimDraft.accountName} onChange={e=>setClaimDraft({...claimDraft,accountName:e.target.value})}/></label>
     <label>Nama Pemohon<input value={claimDraft.applicantName} onChange={e=>setClaimDraft({...claimDraft,applicantName:e.target.value})}/></label>
@@ -933,10 +933,25 @@ export default function Page(){
     <label className="claimCheck"><input type="checkbox" checked={claimDraft.claimProkes} onChange={e=>setClaimDraft({...claimDraft,claimProkes:e.target.checked})}/>Checklist Klaim Prokes</label>
     <label className="full">Keterangan<textarea value={claimDraft.description} onChange={e=>setClaimDraft({...claimDraft,description:e.target.value})}/></label>
    </div>
-   <div className="claimDocs"><div className="claimDocsHead"><h3>Dokumen Persyaratan Klaim</h3><span>Tandai dokumen yang tersedia. Nama file dicatat untuk prototype; file belum disimpan ke server.</span></div>
-    <table><thead><tr><th>No</th><th>Dokumen</th><th>Tersedia</th><th>File</th></tr></thead><tbody>{claimDraft.documents.map((d,i)=><tr key={d.label}><td>{i+1}</td><td><b>{d.label}</b></td><td><input type="checkbox" checked={d.submitted} onChange={e=>{const docs=claimDraft.documents.map((x,j)=>j===i?{...x,submitted:e.target.checked}:x);setClaimDraft({...claimDraft,documents:docs})}}/></td><td><input type="file" onChange={e=>{const fileName=e.target.files?.[0]?.name||"";const docs=claimDraft.documents.map((x,j)=>j===i?{...x,fileName,submitted:!!fileName||x.submitted}:x);setClaimDraft({...claimDraft,documents:docs})}}/>{d.fileName&&<small>{d.fileName}</small>}</td></tr>)}</tbody></table>
+   <div className="claimDocs">
+    <div className="claimDocsHead"><h3>Dokumen Persyaratan Klaim</h3><span>Centang dokumen yang disertakan, lalu upload bukti pendukung untuk nomor pengajuan ini. Boleh gabungan beberapa peserta dalam satu bundle.</span></div>
+    <div className="claimBulkUploader">
+     <div className="claimBulkQuota"><strong>Lampiran Pengajuan</strong><span>{(claimDraft.files?.length||0)+pendingClaimFiles.length} / {CLAIM_MAX_FILES} file · {fileSizeLabel([...(claimDraft.files||[]),...pendingClaimFiles].reduce((total,f)=>total+f.size,0))} / 20 MB</span></div>
+     <label className="claimBulkChoose"><Upload size={16}/> Tambah File Klaim
+      <input type="file" multiple aria-label="Unggah maksimal 10 file tipe apa saja total 20 MB"
+       disabled={uploadBusy||((claimDraft.files?.length||0)+pendingClaimFiles.length)>=CLAIM_MAX_FILES}
+       onChange={event=>{addClaimFiles(Array.from(event.currentTarget.files||[]));event.currentTarget.value="";}}/>
+     </label>
+     {pendingClaimFiles.length>0&&<div className="claimBulkFileRows">{pendingClaimFiles.map((file,index)=><div className="claimBulkFileRow" key={index+"-"+file.name}><FileSpreadsheet size={15}/><span>{file.name}</span><small>{fileSizeLabel(file.size)}</small><button type="button" onClick={()=>{setPendingClaimFiles(v=>v.filter((_,i)=>i!==index));setClaimFileError("")}}><X size={14}/>Hapus</button></div>)}</div>}
+     <p className="claimBulkNote">10 dokumen, total maksimal 20 MB <strong>per nomor pengajuan</strong>, bukan per peserta. Seluruh format diperbolehkan. Berkas hanya tersimpan lokal di browser prototype.</p>
+     {claimFileError&&<div className="caseUploadError" role="alert">{claimFileError}</div>}
+    </div>
+    <table><thead><tr><th>No</th><th>Dokumen</th><th>Tersedia</th></tr></thead><tbody>{claimDraft.documents.map((d,i)=><tr key={d.label}>
+     <td>{i+1}</td><td><b>{d.label}</b></td>
+     <td><input type="checkbox" checked={d.submitted} aria-label={"Tersedia: "+d.label} onChange={e=>{const docs=claimDraft.documents.map((x,j)=>j===i?{...x,submitted:e.target.checked}:x);setClaimDraft({...claimDraft,documents:docs})}}/></td>
+    </tr>)}</tbody></table>
    </div>
-   <div className="workflowActions"><span>Total Bundle yang diajukan: <b>{formatRupiah(claimDraft.bundleTotalBill||selectedCase.dischargeRequest?.finalBill||0)}</b></span><button className="primary" onClick={submitClaim}>Submit Klaim ke PertaLife <ArrowRight size={17}/></button></div>
+   <div className="workflowActions"><span>Total Bundle yang diajukan: <b>{formatRupiah(claimDraft.bundleTotalBill||selectedCase.dischargeRequest?.finalBill||0)}</b></span><button className="primary" disabled={uploadBusy} onClick={submitClaim}>{uploadBusy?"Menyimpan Lampiran...":"Submit Klaim ke PertaLife"} <ArrowRight size={17}/></button></div>
   </section>}
 
   {view==="claim"&&selectedCase&&role==="callcenter"&&selectedCase.claimSubmission&&<section className="card claimForm">
@@ -954,6 +969,18 @@ export default function Page(){
    </div>
   </section>}
 
+  {medicalModal&&hydrated&&createPortal(
+   <div className="caseModalOverlay" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setMedicalModal(null)}}>
+    <section className="card medicalApprovalDialog" role="dialog" aria-modal="true" aria-labelledby="medical-approval-title">
+     <div className="medicalApprovalHeading"><div><h2 id="medical-approval-title">Approval {medicalModal.stage==="Treatment"?"Treatment":"Discharge"}</h2><p>Case {medicalModal.caseId} · Call Center PertaLife</p></div><button type="button" className="reviewClear" onClick={()=>setMedicalModal(null)}><X size={16}/> Tutup</button></div>
+     <form onSubmit={e=>{e.preventDefault();submitMedicalApproval()}} className="medicalApprovalForm">
+      <div className="medicalApprovalInfo"><ShieldCheck size={19}/><span>Persetujuan akan mengubah status case dan merekam nama dokter, catatan medis, serta waktu approval pada History Log.</span></div>
+      <label>Nama Dokter Pemberi Approval *<input autoFocus value={medicalDoctor} onChange={e=>setMedicalDoctor(e.target.value)} maxLength={150} placeholder="Nama dokter PertaLife" required/></label>
+      <label>Catatan Approval / Pertimbangan Medis *<textarea value={medicalNote} onChange={e=>setMedicalNote(e.target.value)} rows={5} maxLength={4000} placeholder="Jelaskan pertimbangan medis dan kondisi penjaminan..." required/></label>
+      <div className="medicalApprovalActions"><button type="button" className="reviewClear" onClick={()=>setMedicalModal(null)}>Batal</button><button type="submit" className="primary" disabled={!medicalDoctor.trim()||!medicalNote.trim()}><CheckCircle2 size={16}/> Konfirmasi Approval</button></div>
+     </form>
+    </section>
+   </div>,document.body)}
   {showCaseDetail&&selectedCase&&hydrated&&createPortal(
   <div className="caseModalOverlay" role="presentation"
    onMouseDown={event=>{if(event.target===event.currentTarget)setShowCaseDetail(false)}}
