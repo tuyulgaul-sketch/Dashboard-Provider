@@ -458,23 +458,31 @@ export default function Page(){
   setFound(null);setLookupDone(false);setComplaint("");setUrgent(false);setUrgencyReason("");setUrgencyText("");
   setShowCaseDetail(false);setSelectedCaseId(null);setFkrtlBenefitCard(null);setNotice("");setPendingAdmissionFiles([]);setAttachmentError("");
  }
- function submitAdmission(){
- if(!found||!canSubmit)return;
- const id="MC-"+new Date().toISOString().slice(2,10).replaceAll("-","")+"-"+String(cases.length+1).padStart(4,"0");
- const at=Date.now(),isEmergency=careAccess==="Emergency";
- const admissionLevel=isEmergency&&activeProvider.code==="PRV-HERMINA-KMY-001"?"FKRTL":"FKTP";
- setCases(v=>[{
-  id,name:found.name,memberId:found.cardNo,company:found.company,
-  provider:activeProvider.name,providerCode:activeProvider.code,status:"Waiting Admission",
-  urgent:isEmergency||urgent,submittedAt:at,issue:complaint,visitType:isEmergency?(activeProvider.code==="PRV-HERMINA-KMY-001"?"UGD / IGD":"Pertolongan Darurat Awal"):visitType,
-  careLevel:admissionLevel,accessRoute:isEmergency?"Emergency":"FKTP",
-  urgencyReason:isEmergency?"Penilaian awal gawat darurat: "+complaint.trim():urgent?(urgencyReason==="Lainnya"?urgencyText:urgencyReason):undefined,
-  policyNo:found.policyNo,planName:found.planName,
-  history:[{at,actor:activeProvider.name,event:isEmergency?"Emergency Admission Submitted":"FKTP Admission Submitted",detail:complaint}]
- },...v]);
- setNotice(isEmergency?"Emergency tercatat dan dikirim untuk verifikasi Call Center. Penanganan kegawatdaruratan tidak boleh tertunda karena administrasi.":"Admission FKTP dikirim ke Call Center PertaLife.");
- setFound(null);setCardNo("");setLookupDone(false);setComplaint("");setUrgent(false);setCareAccess("FKTP");setVisitType("Rawat Jalan");setReferralSearch("");
-}
+ async function submitAdmission(){
+  if(!found||!canSubmit||uploadBusy)return;
+  const id="MC-"+new Date().toISOString().slice(2,10).replaceAll("-","")+"-"+String(cases.length+1).padStart(4,"0");
+  setUploadBusy(true);setAttachmentError("");
+  try{
+   validateCaseFiles([],[],pendingAdmissionFiles);
+   const files=await saveCaseFiles(id,pendingAdmissionFiles,"admission");
+   const at=Date.now(),isEmergency=careAccess==="Emergency";
+   const admissionLevel=isEmergency&&activeProvider.code==="PRV-HERMINA-KMY-001"?"FKRTL":"FKTP";
+   setCases(v=>[{
+    id,name:found.name,memberId:found.cardNo,company:found.company,
+    provider:activeProvider.name,providerCode:activeProvider.code,status:"Waiting Admission",
+    urgent:isEmergency||urgent,submittedAt:at,issue:complaint,visitType:isEmergency?(activeProvider.code==="PRV-HERMINA-KMY-001"?"UGD / IGD":"Pertolongan Darurat Awal"):visitType,
+    careLevel:admissionLevel,accessRoute:isEmergency?"Emergency":"FKTP",
+    urgencyReason:isEmergency?"Penilaian awal gawat darurat: "+complaint.trim():urgent?(urgencyReason==="Lainnya"?urgencyText:urgencyReason):undefined,
+    policyNo:found.policyNo,planName:found.planName,files,
+    history:[{at,actor:activeProvider.name,event:isEmergency?"Emergency Admission Submitted":"FKTP Admission Submitted",detail:complaint},
+     ...(files.length?[{at:at+1,actor:activeProvider.name,event:"Admission Documents Uploaded",detail:files.map(x=>x.name).join(", ")}]:[])]
+   },...v]);
+   setPendingAdmissionFiles([]);
+   setNotice(isEmergency?"Emergency tercatat dan dikirim untuk verifikasi Call Center. Penanganan kegawatdaruratan tidak boleh tertunda karena administrasi.":"Admission FKTP dikirim ke Call Center PertaLife.");
+   setFound(null);setCardNo("");setLookupDone(false);setComplaint("");setUrgent(false);setCareAccess("FKTP");setVisitType("Rawat Jalan");setReferralSearch("");
+  }catch(error){setAttachmentError(error instanceof Error?error.message:"Dokumen tidak dapat disimpan. Admission belum dikirim.");}
+  finally{setUploadBusy(false);}
+ }
  function openReferral(id:string){setSelectedCaseId(id);setShowCaseDetail(false);setView("referrals");setNotice("");}
  function submitReferral(caseId:string,draft:ReferralDraft){
   const source=cases.find(c=>c.id===caseId);
@@ -538,12 +546,25 @@ export default function Page(){
   setCommentText("");setPendingCommentFiles([]);setAttachmentError("");
   setSelectedCaseId(id);setShowCaseDetail(true);
  }
- function openTreatment(id:string){setSelectedCaseId(id);setTreatmentDiagnosis("");setTreatmentProcedure("");setTreatmentMedication("");setTreatmentCost("");setTreatmentReason("");setTreatmentAttachments([]);setView("treatment");setShowCaseDetail(false)}
- function submitTreatment(){
-  if(!selectedCase||!treatmentDiagnosis.trim()||!treatmentProcedure.trim()||!treatmentReason.trim()||!treatmentCost.trim())return;
-  const at=Date.now();setCases(v=>v.map(c=>c.id===selectedCase.id?withHistory({...c,status:"Waiting Treatment Approval",submittedAt:at,treatmentRequest:{diagnosis:treatmentDiagnosis.trim(),procedure:treatmentProcedure.trim(),medication:treatmentMedication.trim(),reason:treatmentReason.trim(),attachments:treatmentAttachments,estimatedCost:parseAmount(treatmentCost),submittedAt:at}},"Treatment Request Submitted",c.provider,treatmentDiagnosis.trim(),at):c));
-  setNotice("Treatment Request berhasil dikirim ke Call Center PertaLife.");
-  setView("dashboard");setSelectedCaseId(null);
+ function openTreatment(id:string){setSelectedCaseId(id);setTreatmentDiagnosis("");setTreatmentProcedure("");setTreatmentMedication("");setTreatmentCost("");setTreatmentReason("");setPendingTreatmentFiles([]);setAttachmentError("");setView("treatment");setShowCaseDetail(false)}
+ async function submitTreatment(){
+  if(!selectedCase||!treatmentDiagnosis.trim()||!treatmentProcedure.trim()||!treatmentReason.trim()||!treatmentCost.trim()||uploadBusy)return;
+  const caseId=selectedCase.id;
+  setUploadBusy(true);setAttachmentError("");
+  try{
+   validateCaseFiles(selectedCase.files||[],[],pendingTreatmentFiles);
+   const files=await saveCaseFiles(caseId,pendingTreatmentFiles,"treatment");
+   const at=Date.now();
+   setCases(v=>v.map(c=>c.id===caseId?withHistory({...c,status:"Waiting Treatment Approval",submittedAt:at,
+    files:[...(c.files||[]),...files],
+    treatmentRequest:{diagnosis:treatmentDiagnosis.trim(),procedure:treatmentProcedure.trim(),medication:treatmentMedication.trim(),reason:treatmentReason.trim(),
+     attachments:files.map(x=>x.name),estimatedCost:parseAmount(treatmentCost),submittedAt:at}},
+    "Treatment Request Submitted",c.provider,treatmentDiagnosis.trim()+(files.length?" · "+files.length+" dokumen dilampirkan":""),at):c));
+   setPendingTreatmentFiles([]);
+   setNotice("Treatment Request berhasil dikirim ke Call Center PertaLife.");
+   setView("dashboard");setSelectedCaseId(null);
+  }catch(error){setAttachmentError(error instanceof Error?error.message:"Lampiran gagal disimpan. Treatment belum diajukan.");}
+  finally{setUploadBusy(false);}
  }
  function openDischarge(id:string){setSelectedCaseId(id);setFinalDiagnosis("");setFinalBill("");setDischargeNotes("");setView("discharge");setShowCaseDetail(false)}
  function submitDischarge(){
@@ -552,32 +573,40 @@ export default function Page(){
   setNotice("Discharge Request berhasil dikirim ke Call Center PertaLife.");
   setView("dashboard");setSelectedCaseId(null);
  }
- function sendCaseComment(){
-  if(!selectedCase||!commentText.trim())return;
-  const text=commentText.trim(),at=Date.now();
+ async function sendCaseComment(){
+  if(!selectedCase||(!commentText.trim()&&!pendingCommentFiles.length)||uploadBusy)return;
+  const caseId=selectedCase.id,actor=role==="callcenter"?"Call Center PertaLife":activeProvider.name;
+  const at=Date.now();
   const stage:ConfirmationStage|null=selectedCase.status==="Waiting Admission"?"Admission":
    selectedCase.status==="Waiting Treatment Approval"?"Treatment":
    selectedCase.status==="Waiting Discharge"?"Discharge":null;
   const pending=!!selectedCase.confirmation&&!selectedCase.confirmation.respondedAt;
+  // A provider reply automatically resolves the open confirmation; no extra mode is required.
   const kind:CommentKind=role==="callcenter"?(commentMode==="need"&&stage?"need":"comment"):
-   commentMode==="reply"&&pending?"reply":"comment";
-  const actor=role==="callcenter"?"Call Center PertaLife":activeProvider.name;
-  const entry:CaseComment={
-   id:"CM-"+at.toString(36)+"-"+Math.random().toString(36).slice(2,8),
-   at,role,author:actor,providerCode:role==="provider"?activeProvider.code:undefined,kind,text,
-   stage:kind==="need"?stage||undefined:kind==="reply"?selectedCase.confirmation?.stage:undefined
-  };
-  setCases(current=>current.map(c=>{
-   if(c.id!==selectedCase.id)return c;
-   const update:CareCase={...c,comments:[...(c.comments||[]),entry]};
-   if(kind==="need"&&stage)update.confirmation={stage,reason:text,requestedAt:at};
-   else if(kind==="reply"&&c.confirmation&&!c.confirmation.respondedAt)
-    update.confirmation={...c.confirmation,response:text,respondedAt:at};
-   const event=kind==="need"?"Need Confirmation - "+stage:kind==="reply"?"Confirmation Response":"Case Comment";
-   return withHistory(update,event,actor,text,at);
-  }));
-  setCommentText("");
-  setCommentMode("comment");
+   pending?"reply":"comment";
+  const entryId="CM-"+at.toString(36)+"-"+Math.random().toString(36).slice(2,8);
+  setUploadBusy(true);setAttachmentError("");
+  try{
+   validateCaseFiles(selectedCase.files||[],[],pendingCommentFiles);
+   const files=await saveCaseFiles(caseId,pendingCommentFiles,"comment",entryId);
+   const text=commentText.trim()||(files.length?"Mengirim "+files.length+" dokumen pendukung.":"");
+   const entry:CaseComment={
+    id:entryId,at,role,author:actor,providerCode:role==="provider"?activeProvider.code:undefined,kind,text,
+    stage:kind==="need"?stage||undefined:kind==="reply"?selectedCase.confirmation?.stage:undefined,
+    fileIds:files.map(file=>file.id)
+   };
+   setCases(current=>current.map(c=>{
+    if(c.id!==caseId)return c;
+    const update:CareCase={...c,files:[...(c.files||[]),...files],comments:[...(c.comments||[]),entry]};
+    if(kind==="need"&&stage)update.confirmation={stage,reason:text,requestedAt:at};
+    else if(kind==="reply"&&c.confirmation&&!c.confirmation.respondedAt)
+     update.confirmation={...c.confirmation,response:text,respondedAt:at};
+    const event=kind==="need"?"Need Confirmation - "+stage:kind==="reply"?"Confirmation Response":"Case Comment";
+    return withHistory(update,event,actor,text+(files.length?" · "+files.length+" dokumen":""),at);
+   }));
+   setCommentText("");setPendingCommentFiles([]);setCommentMode("comment");
+  }catch(error){setAttachmentError(error instanceof Error?error.message:"Lampiran gagal disimpan. Komentar belum dikirim.");}
+  finally{setUploadBusy(false);}
  }
  function openProviderProfile(){
   const profile=providerProfiles[activeProvider.code]||defaultProviderProfiles[activeProvider.code];
