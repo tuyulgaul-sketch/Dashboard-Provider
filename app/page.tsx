@@ -1206,6 +1206,7 @@ export default function Page(){
    return c?.inpatient?createPortal(
     <InpatientReviewModal key={inpatientReview.caseId+"-"+inpatientReview.mode}
      patient={inpatientPatient(c)} episode={c.inpatient} mode={inpatientReview.mode}
+     files={(c.files||[]).filter(file=>file.origin==="discharge")} onDownload={downloadStoredAttachment}
      onClose={()=>setInpatientReview(null)} onDecision={approveInpatientReview}/>,document.body):null;
   })()}
   {medicalModal&&hydrated&&createPortal(
