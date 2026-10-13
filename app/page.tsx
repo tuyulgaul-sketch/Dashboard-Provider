@@ -42,7 +42,7 @@ type CareCase={id:string;name:string;memberId:string;company:string;provider:str
  treatmentApproval?:{doctor:string;note:string;approvedAt:number};
  dischargeRequest?:{finalDiagnosis:string;finalBill:number;notes:string;submittedAt:number;fileIds?:string[]};
  dischargeApproval?:{doctor:string;note:string;approvedAt:number};
- confirmation?:{stage:"Admission"|"Treatment"|"Discharge";reason:string;requestedAt:number;response?:string;respondedAt?:number};
+ confirmation?:{stage:"Admission"|"Treatment"|"Discharge"|"Inpatient";reason:string;requestedAt:number;response?:string;respondedAt?:number};
  comments?:CaseComment[];
  files?:CaseFileMeta[];
  inpatient?:InpatientEpisode;
@@ -363,7 +363,8 @@ export default function Page(){
  const awaitingProviderResponse=!!selectedCase?.confirmation&&!selectedCase.confirmation.respondedAt;
  const confirmationStage:ConfirmationStage|null=selectedCase?.status==="Waiting Admission"?"Admission":
   selectedCase?.status==="Waiting Treatment Approval"?"Treatment":
-  selectedCase?.status==="Waiting Discharge"?"Discharge":null;
+  selectedCase?.status==="Waiting Discharge"?"Discharge":
+  ["Waiting Inpatient Approval","Waiting Inpatient Extension","Waiting Inpatient Discharge"].includes(selectedCase?.status||"")?"Inpatient":null;
  useEffect(()=>{
   if(!hydrated||!showCaseDetail||!selectedCaseId)return;
   const current=cases.find(c=>c.id===selectedCaseId);if(!current)return;
@@ -571,7 +572,7 @@ export default function Page(){
   caseDetailReturnFocusRef.current=focused instanceof HTMLElement?focused:null;
   const current=cases.find(c=>c.id===id);
   const pending=!!current?.confirmation&&!current.confirmation.respondedAt;
-  const waiting=["Waiting Admission","Waiting Treatment Approval","Waiting Discharge"].includes(current?.status||"");
+  const waiting=["Waiting Admission","Waiting Treatment Approval","Waiting Discharge","Waiting Inpatient Approval","Waiting Inpatient Extension","Waiting Inpatient Discharge"].includes(current?.status||"");
   setCommentMode(role==="provider"?(pending?"reply":"comment"):waiting?"need":"comment");
   setCommentText("");setPendingCommentFiles([]);setAttachmentError("");
   setSelectedCaseId(id);setShowCaseDetail(true);
@@ -757,7 +758,8 @@ export default function Page(){
   const at=Date.now();
   const stage:ConfirmationStage|null=selectedCase.status==="Waiting Admission"?"Admission":
    selectedCase.status==="Waiting Treatment Approval"?"Treatment":
-   selectedCase.status==="Waiting Discharge"?"Discharge":null;
+   selectedCase.status==="Waiting Discharge"?"Discharge":
+   ["Waiting Inpatient Approval","Waiting Inpatient Extension","Waiting Inpatient Discharge"].includes(selectedCase.status)?"Inpatient":null;
   const pending=!!selectedCase.confirmation&&!selectedCase.confirmation.respondedAt;
   // A provider reply automatically resolves the open confirmation; no extra mode is required.
   const kind:CommentKind=role==="callcenter"?(commentMode==="need"&&stage?"need":"comment"):
