@@ -73,3 +73,35 @@
 .benefitFoot {padding:13px 15px;}
 }
 @media(max-width:380px){.benefitIdentity,.benefitSummaryGrid {grid-template-columns:1fr 1fr;}.benefitSummaryGrid button {padding:10px;}.benefitSummaryGrid strong {font-size:22px;}}
+
+/* Five concise care-path categories for Provider. Call Center keeps full tabular ledger. */
+.benefitRoleTag {font-size:9px;font-weight:800;letter-spacing:.035em;color:#315f8a;background:#f0f6fc;border:1px solid #d7e7f5;border-radius:999px;padding:5px 9px;}
+.benefitProviderIntro {display:flex;justify-content:space-between;align-items:center;gap:16px;margin:0 22px 12px;}
+.benefitProviderIntro>div {display:flex;flex-direction:column;gap:4px;min-width:0;}
+.benefitProviderIntro strong {font-size:13px;color:var(--pli-ink);}
+.benefitProviderIntro span {font-size:11px;color:var(--pli-muted);line-height:1.55;}
+.benefitClinicalCount {border:1px solid #e2ebf5;border-radius:999px;padding:6px 11px;background:#f8fbff;color:var(--pli-blue-deep)!important;white-space:nowrap;font-size:10px!important;font-weight:800;}
+.providerBenefitGrid {display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:0 22px 15px;}
+.providerBenefitGroupCard {position:relative;display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:7px;border:1px solid #dfebf6;background:#fff;border-radius:14px;padding:13px;cursor:pointer;min-height:148px;min-width:0;transition:background .15s ease,border-color .15s ease,box-shadow .15s ease;}
+.providerBenefitGroupCard:hover {border-color:#a1bfdd;background:#f9fcff;}
+.providerBenefitGroupCard:focus-visible {outline:3px solid #6eafde;outline-offset:2px;}
+.providerBenefitGroupCard.selected {border-color:#3982bd;background:#eff7fe;box-shadow:inset 0 0 0 1px #3982bd,0 4px 12px rgba(37,98,160,.08);}
+.providerBenefitGroupTop {width:100%;display:flex;align-items:center;justify-content:space-between;gap:6px;}
+.providerBenefitGroupIcon {display:grid;place-items:center;width:34px;height:34px;border-radius:10px;color:#215e96;background:#edf5fc;}
+.providerBenefitGroupCount {color:#52708d;background:#f3f7fc;border-radius:999px;padding:4px 7px;font-size:9px;font-weight:750;white-space:nowrap;}
+.providerBenefitGroupCard strong {font-size:11px;line-height:1.42;color:var(--pli-ink);}
+.providerBenefitGroupCard small {font-size:10px;line-height:1.45;color:#6c7c8f;}
+.providerBenefitRecommended {font-size:9px;font-weight:750;color:#29714c;line-height:1.35;margin-top:auto;}
+.providerBenefitSelection {margin:0 22px 13px;background:#f7fafc;border:1px solid #e2eaf4;border-radius:12px;padding:12px 13px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.providerBenefitSelection>div {display:flex;flex-direction:column;gap:4px;min-width:0;}
+.providerBenefitSelection strong {font-size:12px;color:var(--pli-ink);}
+.providerBenefitSelection span {font-size:10px;color:var(--pli-muted);line-height:1.55;}
+.providerBenefitSelection .benefitReset {height:auto;min-height:35px;flex-shrink:0;}
+@media(max-width:1160px){.providerBenefitGrid {grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media(max-width:760px){.providerBenefitGrid {grid-template-columns:repeat(2,minmax(0,1fr));}.providerBenefitGroupCard {min-height:135px;}}
+@media(max-width:620px){
+ .benefitProviderIntro,.providerBenefitGrid,.providerBenefitSelection {margin-left:15px;margin-right:15px;}
+ .benefitProviderIntro,.providerBenefitSelection {align-items:flex-start;flex-wrap:wrap;}
+ .providerBenefitSelection .benefitReset {width:100%;}
+}
+@media(max-width:390px){.providerBenefitGrid {grid-template-columns:1fr;}.providerBenefitGroupCard {min-height:0;}}
