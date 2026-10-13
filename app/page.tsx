@@ -1,5 +1,6 @@
 "use client";
-import {useEffect,useMemo,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
+import {createPortal} from "react-dom";
 import {Activity,AlertTriangle,ArrowRight,Building2,CheckCircle2,ChevronDown,ChevronLeft,ChevronRight,Clock3,Database,Eye,FileCheck2,FileSpreadsheet,Plus,Search,Settings,ShieldCheck,Stethoscope,Trash2,Upload,UserRound,X} from "lucide-react";
 import SidebarNavigation from "./SidebarNavigation";
 import BenefitCoverage from "./BenefitCoverage";
@@ -203,6 +204,8 @@ export default function Page(){
  const [urgent,setUrgent]=useState(false),[urgencyReason,setUrgencyReason]=useState(""),[urgencyText,setUrgencyText]=useState(""),[complaint,setComplaint]=useState("");
  const [view,setView]=useState("dashboard"),[notice,setNotice]=useState("");
  const [selectedCaseId,setSelectedCaseId]=useState<string|null>(null),[showCaseDetail,setShowCaseDetail]=useState(false);
+ const caseDetailCloseRef=useRef<HTMLButtonElement|null>(null);
+ const caseDetailReturnFocusRef=useRef<HTMLElement|null>(null);
  const [treatmentDiagnosis,setTreatmentDiagnosis]=useState(""),[treatmentProcedure,setTreatmentProcedure]=useState(""),[treatmentMedication,setTreatmentMedication]=useState(""),[treatmentCost,setTreatmentCost]=useState(""),[treatmentReason,setTreatmentReason]=useState(""),[treatmentAttachments,setTreatmentAttachments]=useState<string[]>([]);
  const [finalDiagnosis,setFinalDiagnosis]=useState(""),[finalBill,setFinalBill]=useState(""),[dischargeNotes,setDischargeNotes]=useState("");
  const [claimDraft,setClaimDraft]=useState<ClaimSubmission|null>(null),[selectedClaimCases,setSelectedClaimCases]=useState<string[]>([]);
@@ -213,6 +216,22 @@ export default function Page(){
  useEffect(()=>{if(hydrated)localStorage.setItem("pertalife-managed-care-members-v2",JSON.stringify(members));},[members,hydrated]);
  useEffect(()=>{if(hydrated)localStorage.setItem("pertalife-managed-care-cases",JSON.stringify(cases));},[cases,hydrated]);
  useEffect(()=>{if(hydrated)localStorage.setItem("pertalife-managed-care-provider-profiles",JSON.stringify(providerProfiles));},[providerProfiles,hydrated]);
+
+ useEffect(()=>{
+  if(!showCaseDetail)return;
+  const previousOverflow=document.body.style.overflow;
+  document.body.style.overflow="hidden";
+  caseDetailCloseRef.current?.focus();
+  const onEscape=(event:KeyboardEvent)=>{
+   if(event.key==="Escape"){event.preventDefault();setShowCaseDetail(false)}
+  };
+  window.addEventListener("keydown",onEscape);
+  return ()=>{
+   window.removeEventListener("keydown",onEscape);
+   document.body.style.overflow=previousOverflow;
+   if(caseDetailReturnFocusRef.current?.isConnected)caseDetailReturnFocusRef.current.focus();
+  };
+ },[showCaseDetail]);
 
  const activeProvider=providerAccounts.find(p=>p.code===activeProviderCode)||providerAccounts[0];
  const activeProviderProfile=providerProfiles[activeProvider.code]||defaultProviderProfiles[activeProvider.code];
@@ -434,7 +453,11 @@ export default function Page(){
   });
   setNotice(outcome==="Approved"?"Rujukan Approved. Admission FKRTL Hermina otomatis dibuat tanpa approval Admission kedua. Treatment tetap perlu persetujuan tersendiri.":"Rujukan "+outcome+". Provider dapat melihat catatan verifikasi.");
  }
- function openCaseDetail(id:string){setSelectedCaseId(id);setShowCaseDetail(true)}
+ function openCaseDetail(id:string){
+  const focused=document.activeElement;
+  caseDetailReturnFocusRef.current=focused instanceof HTMLElement?focused:null;
+  setSelectedCaseId(id);setShowCaseDetail(true);
+ }
  function openTreatment(id:string){setSelectedCaseId(id);setTreatmentDiagnosis("");setTreatmentProcedure("");setTreatmentMedication("");setTreatmentCost("");setTreatmentReason("");setTreatmentAttachments([]);setView("treatment");setShowCaseDetail(false)}
  function submitTreatment(){
   if(!selectedCase||!treatmentDiagnosis.trim()||!treatmentProcedure.trim()||!treatmentReason.trim()||!treatmentCost.trim())return;
@@ -730,8 +753,12 @@ export default function Page(){
    </div>
   </section>}
 
-  {showCaseDetail&&selectedCase&&<section className="card caseDetail">
-   <div className="sectionHead"><div><h2>Detail Case {selectedCase.id}{selectedCase.demo?" — DUMMY / SIMULASI":""}</h2><p>{selectedCase.name} · {selectedCase.memberId}</p></div><button className="reviewClear" onClick={()=>setShowCaseDetail(false)}><X size={15}/> Tutup</button></div>
+  {showCaseDetail&&selectedCase&&hydrated&&createPortal(
+  <div className="caseModalOverlay" role="presentation"
+   onMouseDown={event=>{if(event.target===event.currentTarget)setShowCaseDetail(false)}}
+   onKeyDown={event=>{if(event.key==="Tab"){event.preventDefault();caseDetailCloseRef.current?.focus()}}}>
+   <section className="card caseDetail caseModalDialog" role="dialog" aria-modal="true" aria-labelledby="case-modal-title" aria-describedby="case-modal-person">
+   <div className="sectionHead caseModalHeader"><div><h2 id="case-modal-title">Detail Case {selectedCase.id}{selectedCase.demo?" — DUMMY / SIMULASI":""}</h2><p id="case-modal-person">{selectedCase.name} · {selectedCase.memberId}</p></div><button type="button" ref={caseDetailCloseRef} className="reviewClear caseModalClose" onClick={()=>setShowCaseDetail(false)} aria-label="Tutup detail case"><X size={17}/> Tutup</button></div>
    <div className="detailGrid detailGridWide caseDetailGrid">
     <div><span>Status</span><b>{selectedCase.status}</b></div><div><span>Tingkat Pelayanan</span><b>{selectedCase.careLevel||"FKTP (legacy)"}</b></div><div><span>Jalur Akses</span><b>{selectedCase.accessRoute||"FKTP (legacy)"}</b></div>{selectedCase.parentCaseId&&<div><span>Episode FKTP Asal</span><b>{selectedCase.parentCaseId}</b></div>}{selectedCase.specialty&&<div><span>Poli Spesialis</span><b>{selectedCase.specialty}</b></div>}{selectedCase.referral&&<><div><span>Status Rujukan</span><b>{selectedCase.referral.status}</b></div><div><span>Rujukan</span><b>{selectedCase.referral.refNumber} · {selectedCase.referral.specialty}</b></div><div><span>Catatan Verifikasi Rujukan</span><b>{selectedCase.referral.reviewNote||"-"}</b></div>{selectedCase.referral.linkedCaseId&&<div><span>Episode FKRTL Terkait</span><b>{selectedCase.referral.linkedCaseId}</b></div>}</>}<div><span>Provider</span><b>{selectedCase.provider}</b></div><div><span>Provider Code</span><b>{selectedCase.providerCode||"-"}</b></div><div><span>Jenis Kunjungan</span><b>{selectedCase.visitType}</b></div>
     <div><span>Urgent</span><b>{selectedCase.urgent?"Ya":"Tidak"}</b></div><div><span>Alasan Urgent</span><b>{selectedCase.urgencyReason||"-"}</b></div><div><span>Keluhan</span><b>{selectedCase.issue}</b></div><div><span>Polis / Plan</span><b>{selectedCase.policyNo||"-"} / {selectedCase.planName||"-"}</b></div>
@@ -752,7 +779,8 @@ export default function Page(){
     <div className="caseSubhead"><Clock3 size={17}/><div><b>History Log Case</b><span>Jejak submit, verifikasi, approval, klaim, reminder, dan pembayaran.</span></div></div>
     <div className="timelineList">{selectedHistory.length===0?<div className="emptyEvidence">Belum ada history log yang dapat ditampilkan.</div>:selectedHistory.slice().sort((a,b)=>b.at-a.at).map((h,i)=><div className="timelineItem" key={h.at+"-"+i}><div className="timelineDot"></div><div><b>{h.event}</b><span>{h.actor} · {new Date(h.at).toLocaleString("id-ID")}</span>{h.detail&&<p>{h.detail}</p>}</div></div>)}</div>
    </div>
-  </section>}
+   </section>
+  </div>,document.body)}
 
   {view==="history"&&<section className="card dischargeHistory">
    <div className="sectionHead"><div><h2>Riwayat Discharge & Pembayaran</h2><p>{role==="provider"?"Centang beberapa discharge approved untuk dijadikan satu bundle klaim ke PertaLife.":"Pantau discharge provider, bundle klaim, final bill, reminder, dan status proses pembayaran."}</p></div><div className="historyHeadActions">{role==="provider"&&<button className="primary" disabled={!selectedClaimCases.length} onClick={()=>openClaimBundle(selectedClaimCases)}>Ajukan Bundle ({selectedClaimCases.length})</button>}<span className="countPill">{dischargeHistory.length} discharge</span></div></div>
