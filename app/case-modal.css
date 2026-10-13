@@ -51,3 +51,63 @@
  .caseModalDialog>.caseEvidence,.caseModalDialog>.caseTimeline {margin:12px;}
 }
 @media(prefers-reduced-motion:reduce){.caseModalDialog{animation:none;}}
+
+/* Bi-directional case comments inside the detail modal. */
+.caseModalHeaderActions {display:flex;align-items:center;gap:9px;flex-shrink:0;}
+.caseModalDiscussionJump {display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 12px;min-height:39px;border:1px solid #cce0f2;border-radius:11px;background:#eef6ff;color:#1d578f;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;}
+.caseModalDiscussionJump:hover {background:#e3f0ff;}
+.caseCommentsPanel {margin:16px 22px 19px;border:1px solid #dce7f3;border-radius:15px;background:#fff;overflow:hidden;scroll-margin-top:85px;}
+.caseCommentsPanel>.caseSubhead {display:flex;align-items:flex-start;gap:10px;}
+.caseThreadCount {flex-shrink:0;background:#edf4ff;color:#285b90;border-radius:999px;padding:6px 10px;font-size:10px;font-weight:800;}
+.casePendingConfirmation {display:flex;align-items:flex-start;gap:10px;padding:12px 15px;margin:13px 16px 0;border:1px solid #f3cfca;background:#fff5f1;border-radius:11px;color:#aa4a2b;}
+.casePendingConfirmation svg {flex-shrink:0;margin-top:2px;}
+.casePendingConfirmation strong,.casePendingConfirmation span {display:block;}
+.casePendingConfirmation strong {font-size:12px;margin-bottom:4px;}
+.casePendingConfirmation span {font-size:11px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;}
+.caseCommentThread {display:flex;flex-direction:column;gap:10px;padding:17px 16px;max-height:380px;overflow-y:auto;overscroll-behavior:contain;}
+.caseNoComments {padding:20px 14px;text-align:center;color:#78889b;font-size:12px;background:#f8fafc;border-radius:12px;}
+.caseCommentMessage {max-width:90%;padding:12px 15px;border-radius:13px;border:1px solid #dbe6f1;background:#f8fafc;}
+.caseCommentMessage.own {align-self:flex-end;background:#eff7ff;border-color:#c9e2f8;}
+.caseCommentMessage.incoming {align-self:flex-start;}
+.caseCommentMeta {display:flex;align-items:center;flex-wrap:wrap;gap:7px 9px;}
+.caseCommentMeta strong {font-size:11px;color:#263c5b;}
+.caseCommentMeta time {margin-left:auto;font-size:10px;color:#8a96a6;white-space:nowrap;}
+.caseCommentType {font-size:9px;font-weight:800;color:#23578a;background:#e7f0fa;padding:4px 7px;border-radius:99px;white-space:nowrap;}
+.caseCommentType.needs {color:#a33e24;background:#ffece7;}
+.caseCommentType.replied {color:#207651;background:#e5f7ee;}
+.caseCommentMessage p {margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;color:#293b55;font-size:12px;line-height:1.65;}
+.caseCommentCompose {display:flex;flex-direction:column;gap:10px;padding:15px 17px 17px;border-top:1px solid #e2ebf4;background:#fcfdff;}
+.caseCommentComposeTitle {display:flex;flex-direction:column;gap:4px;}
+.caseCommentComposeTitle strong {font-size:13px;color:#243953;}
+.caseCommentComposeTitle span {font-size:11px;color:#7a8aa0;}
+.caseCommentModes {display:flex;flex-wrap:wrap;gap:8px;}
+.caseCommentModes button {padding:8px 12px;border:1px solid #d8e5f1;border-radius:9px;background:#fff;color:#5f738e;font-size:11px;font-weight:750;cursor:pointer;}
+.caseCommentModes button.selected {background:#eaf4ff;color:#185591;border-color:#74a9d8;box-shadow:0 0 0 1px #87b8de;}
+.caseCommentCompose label {font-size:11px;font-weight:800;color:#566d87;}
+.caseCommentCompose textarea {width:100%;min-height:86px;max-height:200px;resize:vertical;padding:12px 13px;border-radius:11px;border:1px solid #cedce9;background:#fff;color:#20344e;font:inherit;font-size:12px;line-height:1.5;outline:none;}
+.caseCommentCompose textarea:focus-visible {border-color:#428bcb;box-shadow:0 0 0 3px rgba(66,139,203,.12);}
+.caseCommentActions {display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.caseCommentActions>span {font-size:10px;color:#71849c;line-height:1.5;}
+.caseCommentActions .primary {flex-shrink:0;cursor:pointer;}
+.caseUnreadBadge {display:inline-flex;justify-content:center;align-items:center;min-width:21px;min-height:21px;border-radius:99px;padding:2px 6px;background:#cf2441;color:#fff;font-size:10px;font-weight:850;line-height:1;box-shadow:0 0 0 2px #fff;}
+.caseUnreadGlobal {display:flex;align-items:center;justify-content:center;gap:5px;border:1px solid #efc4cb;background:#fff1f2;color:#bd2642;border-radius:99px;padding:7px 10px;min-width:80px;cursor:pointer;font-size:10px;font-weight:850;white-space:nowrap;}
+.caseUnreadGlobal span {color:inherit!important;margin:0!important;}
+.caseQueueTools {display:flex;align-items:center;gap:9px;flex-wrap:wrap;}
+.caseQueueUnread {display:inline-flex;align-items:center;gap:6px;color:#b82442;border:1px solid #f1ccd3;background:#fff2f3;border-radius:99px;padding:6px 9px;font-size:10px;font-weight:800;white-space:nowrap;}
+.referralUnreadCount {margin-left:5px;}
+@media(max-width:700px){
+ .caseModalHeaderActions {flex-direction:column;align-items:stretch;gap:6px;}
+ .caseModalDiscussionJump {min-height:32px;font-size:10px;padding:6px;}
+ .caseCommentMessage {max-width:100%;}
+ .caseCommentActions {align-items:stretch;flex-direction:column;}
+ .caseCommentActions .primary {justify-content:center;}
+ .caseQueueTools {width:100%;}
+}
+@media(max-width:560px){
+ .caseCommentsPanel {margin:11px 12px 14px;}
+ .caseCommentsPanel>.caseSubhead {flex-wrap:wrap;}
+ .caseCommentThread {padding:12px;}
+ .caseCommentCompose {padding:12px;}
+ .casePendingConfirmation {margin:10px 12px 0;}
+ .caseCommentMeta time {margin-left:0;}
+}
