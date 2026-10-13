@@ -829,7 +829,7 @@ export default function Page(){
      }else if(!event.shiftKey&&(document.activeElement===last||!caseDetailDialogRef.current?.contains(document.activeElement))){
       event.preventDefault();first.focus();
      }
-    }>
+    }}>
    <section ref={caseDetailDialogRef} className="card caseDetail caseModalDialog" role="dialog" aria-modal="true" aria-labelledby="case-modal-title" aria-describedby="case-modal-person">
    <div className="sectionHead caseModalHeader"><div><h2 id="case-modal-title">Detail Case {selectedCase.id}{selectedCase.demo?" — DUMMY / SIMULASI":""}</h2><p id="case-modal-person">{selectedCase.name} · {selectedCase.memberId}</p></div><div className="caseModalHeaderActions"><button type="button" className="caseModalDiscussionJump" onClick={()=>document.getElementById("case-discussion")?.scrollIntoView({behavior:"smooth",block:"center"})}><MessageSquareText size={16}/>Diskusi ({modalComments.length})</button><button type="button" ref={caseDetailCloseRef} className="reviewClear caseModalClose" onClick={()=>setShowCaseDetail(false)} aria-label="Tutup detail case"><X size={17}/> Tutup</button></div></div>
    <div className="detailGrid detailGridWide caseDetailGrid">
