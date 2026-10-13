@@ -10,7 +10,7 @@ import {
 import type {InpatientForm,InpatientBilling,InpatientEpisode} from "./inpatient-model";
 
 const rupiah=(v:number)=>"Rp "+Math.max(0,v||0).toLocaleString("id-ID");
-type Patient={name:string;memberId:string;company:string;provider:string;gender?:string;dob?:string;planName?:string};
+type Patient={name:string;memberId:string;company:string;provider:string;gender?:string;dob?:string;relation?:string;planName?:string};
 const Field=({label,value,onChange,required=false,placeholder="",type="text"}:{label:string;value:string;onChange:(v:string)=>void;required?:boolean;placeholder?:string;type?:string})=>
  <label className="inpatientField">{label}{required&&<em> *</em>}<input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} required={required}/></label>;
 const Multiline=({label,value,onChange,required=false}:{label:string;value:string;onChange:(v:string)=>void;required?:boolean})=>
@@ -101,6 +101,9 @@ export function InpatientBillingForm({patient,episode,onSubmit,onCancel,uploadSl
     <div><span>No. Peserta</span><strong>{patient.memberId}</strong></div>
     <div><span>Perusahaan</span><strong>{patient.company}</strong></div>
     <div><span>Rumah Sakit</span><strong>{patient.provider}</strong></div>
+    <div><span>Tanggal Lahir</span><strong>{patient.dob||"-"}</strong></div>
+    <div><span>Jenis Kelamin</span><strong>{patient.gender||"-"}</strong></div>
+    <div><span>Status Peserta (Pekerja / Istri / Anak)</span><strong>{patient.relation||"-"}</strong></div>
    </div>
    <h3>2. Informasi Perawatan</h3>
    <div className="inpatientFields">
