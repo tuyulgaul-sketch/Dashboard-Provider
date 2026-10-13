@@ -10,7 +10,7 @@ import {isHospitalEligible,isoToday,dateOffset,isExtensionWindow,totalSubmitted,
 import type {InpatientEpisode,InpatientForm,InpatientBilling} from "./inpatient-model";
 import {claimTypeFromAdmission,claimTypeSummary,validateClaimFiles,CLAIM_MAX_FILES,CLAIM_MAX_BYTES} from "./claim-workflow";
 import type {CaseFileMeta} from "./case-files";
-import {Activity,AlertTriangle,ArrowRight,Building2,CheckCircle2,ChevronDown,ChevronLeft,ChevronRight,Clock3,Database,Eye,FileCheck2,FileSpreadsheet,MessageSquareText,Plus,Search,Send,Settings,ShieldCheck,Stethoscope,Trash2,Upload,UserRound,X} from "lucide-react";
+import {Activity,AlertTriangle,ArrowRight,Building2,CheckCircle2,ChevronDown,ChevronLeft,ChevronRight,Clock3,BedDouble,Database,Eye,FileCheck2,FileSpreadsheet,MessageSquareText,Plus,Search,Send,Settings,ShieldCheck,Stethoscope,Trash2,Upload,UserRound,X} from "lucide-react";
 import SidebarNavigation from "./SidebarNavigation";
 import BenefitCoverage from "./BenefitCoverage";
 import {ProviderReferrals,CallCenterReferrals} from "./ReferralPanels";
