@@ -596,6 +596,131 @@ export default function Page(){
   }catch(error){setAttachmentError(error instanceof Error?error.message:"Lampiran gagal disimpan. Treatment belum diajukan.");}
   finally{setUploadBusy(false);}
  }
+
+ function inpatientPatient(c:CareCase){
+  const m=members.find(x=>x.cardNo.toLowerCase()===c.memberId.toLowerCase());
+  return {name:c.name,memberId:c.memberId,company:c.company,provider:c.provider,
+   gender:m?.gender||"",dob:m?.dob||"",planName:c.planName||m?.planName||""};
+ }
+ function inpatientHospital(c:CareCase){
+  const type=providerProfiles[c.providerCode||""]?.providerType||
+   defaultProviderProfiles[c.providerCode||""]?.providerType;
+  return isHospitalEligible(c.providerCode,type);
+ }
+ function canStartInpatient(c:CareCase){
+  return role==="provider"&&inpatientHospital(c)&&!c.inpatient&&
+   ["Treatment Active","Treatment Approved"].includes(c.status);
+ }
+ function startInpatient(id:string){
+  const c=cases.find(c=>c.id===id);
+  if(!c||!canStartInpatient(c))return;
+  setSelectedCaseId(id);setView("inpatient-form");setShowCaseDetail(false);setNotice("");
+ }
+ function submitInpatientRequest(request:InpatientForm){
+  const c=selectedCase;
+  if(!c||!canStartInpatient(c))return;
+  const at=Date.now();
+  const episode:InpatientEpisode={state:"Waiting Approval",request,requestedAt:at,extensions:[]};
+  setCases(v=>v.map(x=>x.id===c.id?withHistory({
+   ...x,inpatient:episode,status:"Waiting Inpatient Approval",submittedAt:at
+  },"Inpatient Admission Requested",c.provider,
+   "Diagnosa: "+request.diagnosis+" · Estimasi "+request.estimatedDays+" hari · "+request.admissionDate,at):x));
+  setView("dashboard");setSelectedCaseId(null);
+  setNotice("Formulir Prokes Rawat Inap terkirim. Tunggu verifikasi jumlah hari dan approval dokter Call Center.");
+ }
+ function openInpatientExtension(c:CareCase){
+  if(role!=="provider"||!c.inpatient||c.inpatient.state!=="Active")return;
+  const end=c.inpatient.extensions.filter(x=>x.status==="Approved").at(-1)?.endDate||c.inpatient.approval?.endDate||"";
+  if(!isExtensionWindow(end)){setNotice("Permohonan extend hanya dapat diajukan mulai H-1 atau hari terakhir jaminan ("+end+").");return;}
+  setExtendCaseId(c.id);setExtendReason("");
+ }
+ function submitInpatientExtension(){
+  const c=cases.find(x=>x.id===extendCaseId);
+  if(role!=="provider"||!c?.inpatient||c.inpatient.state!=="Active"||!extendReason.trim())return;
+  const end=c.inpatient.extensions.filter(x=>x.status==="Approved").at(-1)?.endDate||c.inpatient.approval?.endDate||"";
+  if(!isExtensionWindow(end)){setNotice("Belum masuk periode pengajuan perpanjangan H-1.");return;}
+  const at=Date.now();
+  setCases(v=>v.map(x=>x.id===c.id&&x.inpatient?withHistory({...x,
+   status:"Waiting Inpatient Extension",submittedAt:at,
+   inpatient:{...x.inpatient,state:"Waiting Extension",
+    extensions:[...x.inpatient.extensions,{id:"EXT-"+at,reason:extendReason.trim(),requestedAt:at,status:"Pending"}]}
+  },"Inpatient Extension Requested",x.provider,extendReason.trim(),at):x));
+  setExtendCaseId(null);setExtendReason("");setNotice("Alasan perpanjangan sudah dikirim ke Call Center untuk penentuan tambahan hari.");
+ }
+ function openInpatientBilling(id:string){
+  const c=cases.find(x=>x.id===id);
+  if(role!=="provider"||!c?.inpatient||c.inpatient.state!=="Active")return;
+  setSelectedCaseId(id);setPendingDischargeFiles([]);setAttachmentError("");setView("inpatient-billing");
+ }
+ async function submitInpatientBilling(bill:InpatientBilling){
+  const c=selectedCase;
+  if(!c?.inpatient||c.inpatient.state!=="Active"||role!=="provider"||uploadBusy)return;
+  if(!pendingDischargeFiles.length){setAttachmentError("Lampirkan minimal satu kwitansi atau rincian biaya sebagai bukti perhitungan pasien pulang.");return;}
+  if(totalSubmitted(bill.lines)<=0){setAttachmentError("Total biaya yang diajukan harus lebih dari Rp0.");return;}
+  setUploadBusy(true);setAttachmentError("");
+  try{
+   validateCaseFiles(c.files||[],[],pendingDischargeFiles);
+   const files=await saveCaseFiles(c.id,pendingDischargeFiles,"discharge");
+   const at=Date.now(),total=totalSubmitted(bill.lines);
+   setCases(v=>v.map(x=>x.id===c.id&&x.inpatient?withHistory({...x,
+    files:[...(x.files||[]),...files],status:"Waiting Inpatient Discharge",submittedAt:at,
+    inpatient:{...x.inpatient,state:"Waiting Discharge",billing:{...bill,submittedAt:at}},
+    dischargeRequest:{finalDiagnosis:bill.finalDiagnosis,finalBill:total,notes:bill.providerNotes,submittedAt:at,
+     fileIds:files.map(file=>file.id)}
+   },"Inpatient Discharge Billing Submitted",x.provider,
+    total.toLocaleString("id-ID")+" · "+files.length+" lampiran · "+bill.lines.filter(line=>line.submitted>0).length+" komponen biaya",at):x));
+   setPendingDischargeFiles([]);setSelectedCaseId(null);setView("dashboard");
+   setNotice("Perhitungan billing pasien pulang telah diajukan untuk assessment PertaLife.");
+  }catch(error){setAttachmentError(error instanceof Error?error.message:"Perhitungan pasien pulang gagal dikirim.");}
+  finally{setUploadBusy(false);}
+ }
+ function openInpatientReview(id:string,mode:"admission"|"extension"|"billing"){
+  const c=cases.find(x=>x.id===id);
+  const expected=mode==="admission"?"Waiting Inpatient Approval":mode==="extension"?"Waiting Inpatient Extension":"Waiting Inpatient Discharge";
+  if(role!=="callcenter"||!c?.inpatient||c.status!==expected)return;
+  setInpatientReview({caseId:id,mode});setShowCaseDetail(false);
+ }
+ function approveInpatientReview(review:{doctor:string;days:number;note:string;approvedCosts?:number[];nonCoveredExplanation?:string;bufferNotes?:string}){
+  const task=inpatientReview;
+  if(!task||role!=="callcenter")return;
+  const c=cases.find(x=>x.id===task.caseId);
+  if(!c?.inpatient)return;
+  const expected=task.mode==="admission"?"Waiting Inpatient Approval":task.mode==="extension"?"Waiting Inpatient Extension":"Waiting Inpatient Discharge";
+  if(c.status!==expected){setNotice("Status case telah berubah. Mohon buka ulang antrean.");setInpatientReview(null);return;}
+  const at=Date.now(),doctor=review.doctor,note=review.note;
+  if(task.mode==="admission"){
+   const endDate=dateOffset(c.inpatient.request.admissionDate,review.days-1);
+   setCases(v=>v.map(x=>x.id===c.id&&x.inpatient?withHistory({...x,status:"Inpatient Active",submittedAt:at,
+    inpatient:{...x.inpatient,state:"Active",
+     approval:{doctor,days:review.days,note,approvedAt:at,startDate:x.inpatient.request.admissionDate,endDate}}
+   },"Inpatient Approved","dr. "+doctor+" / PertaLife",review.days+" hari · s.d. "+endDate+" · "+note,at):x));
+   setNotice("Rawat inap disetujui "+review.days+" hari hingga "+endDate+".");
+  }else if(task.mode==="extension"){
+   const currentEnd=c.inpatient.extensions.filter(x=>x.status==="Approved").at(-1)?.endDate||c.inpatient.approval?.endDate||"";
+   const newEnd=dateOffset(currentEnd,review.days);
+   setCases(v=>v.map(x=>x.id===c.id&&x.inpatient?withHistory({...x,status:"Inpatient Active",submittedAt:at,
+    inpatient:{...x.inpatient,state:"Active",
+     extensions:x.inpatient.extensions.map(e=>e.status==="Pending"?{...e,status:"Approved" as const,doctor,
+      approvedDays:review.days,note,reviewedAt:at,endDate:newEnd}:e)}
+   },"Inpatient Extension Approved","dr. "+doctor+" / PertaLife",review.days+" hari tambahan · s.d. "+newEnd+" · "+note,at):x));
+   setNotice("Extension disetujui "+review.days+" hari tambahan hingga "+newEnd+".");
+  }else if(c.inpatient.billing){
+   const bill=c.inpatient.billing;
+   const costs=bill.lines.map((row,i)=>({...row,approved:review.approvedCosts?.[i]??0}));
+   if(costs.some(x=>x.approved<0||x.approved>x.submitted)){setNotice("Biaya disetujui tidak valid.");return;}
+   const checked=withComputedExcess(costs);
+   setCases(v=>v.map(x=>x.id===c.id&&x.inpatient?withHistory({...x,status:"Closed",submittedAt:at,
+    inpatient:{...x.inpatient,state:"Discharged",billing:{...bill,lines:checked,reviewedAt:at,
+      reviewerDoctor:doctor,callCenterNotes:note,nonCoveredExplanation:review.nonCoveredExplanation,
+      bufferNotes:review.bufferNotes}},
+    dischargeApproval:{doctor,note,approvedAt:at}
+   },"Inpatient Billing Approved","dr. "+doctor+" / PertaLife",
+    "Diajukan "+totalSubmitted(checked).toLocaleString("id-ID")+" · Disetujui "+checked.reduce((n,x)=>n+(x.approved||0),0).toLocaleString("id-ID")+" · "+note,at):x));
+   setNotice("Final perhitungan pasien pulang disetujui. Case Closed dan siap diproses ke klaim.");
+  }
+  setInpatientReview(null);
+ }
+
  function openDischarge(id:string){
   setSelectedCaseId(id);setFinalDiagnosis("");setFinalBill("");setDischargeNotes("");
   setPendingDischargeFiles([]);setAttachmentError("");setView("discharge");setShowCaseDetail(false);
