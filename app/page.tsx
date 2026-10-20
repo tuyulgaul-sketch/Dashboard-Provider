@@ -219,6 +219,7 @@ export default function Page(){
  const [actionModal,setActionModal]=useState<"admission"|"treatment"|"discharge"|"inpatient-form"|"inpatient-billing"|"claim"|null>(null);
  const [worklistTab,setWorklistTab]=useState<"action"|"process"|"history">("action");
  const [selectedCaseId,setSelectedCaseId]=useState<string|null>(null),[showCaseDetail,setShowCaseDetail]=useState(false);
+ const [referralModalCaseId,setReferralModalCaseId]=useState<string|null>(null);
  const caseDetailCloseRef=useRef<HTMLButtonElement|null>(null);
  const caseDetailReturnFocusRef=useRef<HTMLElement|null>(null);
  const caseDetailDialogRef=useRef<HTMLElement|null>(null);
@@ -538,7 +539,7 @@ export default function Page(){
   }catch(error){setAttachmentError(error instanceof Error?error.message:"Dokumen tidak dapat disimpan. Admission belum dikirim.");}
   finally{setUploadBusy(false);}
  }
- function openReferral(id:string){setSelectedCaseId(id);setShowCaseDetail(false);setView("referrals");setNotice("");}
+ function openReferral(id:string){setReferralModalCaseId(id);setShowCaseDetail(false);setNotice("");}
  function submitReferral(caseId:string,draft:ReferralDraft){
   const source=cases.find(c=>c.id===caseId);
   if(!source||!eligibleReferralIds.includes(caseId)){setNotice("Rujukan hanya dapat dibuat dari episode FKTP yang sesuai dengan Faskes 1 dan sudah disetujui Call Center.");return;}
@@ -599,7 +600,7 @@ export default function Page(){
   const waiting=["Waiting Admission","Waiting Treatment Approval","Waiting Discharge","Waiting Inpatient Approval","Waiting Inpatient Extension","Waiting Inpatient Discharge"].includes(current?.status||"");
   setCommentMode(role==="provider"?(pending?"reply":"comment"):waiting?"need":"comment");
   setCommentText("");setPendingCommentFiles([]);setAttachmentError("");
-  setSelectedCaseId(id);setShowCaseDetail(true);
+  setReferralModalCaseId(null);setSelectedCaseId(id);setShowCaseDetail(true);
  }
  function openTreatment(id:string){setSelectedCaseId(id);setTreatmentDiagnosis("");setTreatmentProcedure("");setTreatmentMedication("");setTreatmentCost("");setTreatmentReason("");setPendingTreatmentFiles([]);setAttachmentError("");setActionModal("treatment");setShowCaseDetail(false)}
  async function submitTreatment(){
@@ -963,7 +964,7 @@ export default function Page(){
  return <div className="shell">
  <aside>
   <div className="brand"><div className="brandLogoFrame"><img src="/pertalife-logo.webp" alt="PertaLife Insurance" className="brandLogo" width="360" height="170"/></div><span className="brandCaption">MANAGED CARE PORTAL</span></div>
-  <SidebarNavigation role={role} view={view} onNavigate={(target,resetFilter)=>{setView(target);setActionModal(null);setWorklistTab(target==="registration"?"process":"action");if(resetFilter)setStatusFilter(null);if(target==="referrals"){setSelectedCaseId(null);setShowCaseDetail(false)}}} onOpenProviderProfile={openProviderProfile}/>
+  <SidebarNavigation role={role} view={view} onNavigate={(target,resetFilter)=>{setView(target);setActionModal(null);setReferralModalCaseId(null);setWorklistTab(target==="registration"?"process":"action");if(resetFilter)setStatusFilter(null);if(target==="referrals"){setSelectedCaseId(null);setShowCaseDetail(false)}}} onOpenProviderProfile={openProviderProfile}/>
   <div className="sideFoot"><span>Prototype Mode</span><small>Browser data · No production DB</small></div>
  </aside>
  <main>
@@ -1088,7 +1089,7 @@ export default function Page(){
   {role==="provider"&&actionModal==="admission"&&found&&careAccess!=="FKRTL"&&<BenefitCoverage key={found.cardNo} member={found} memberActive={active} variant="provider" serviceContext={careAccess}/>}
   {role==="provider"&&actionModal==="admission"&&careAccess==="FKRTL"&&fkrtlBenefitMember&&<BenefitCoverage key={fkrtlBenefitMember.cardNo} member={fkrtlBenefitMember} memberActive={isActiveMember(fkrtlBenefitMember)} variant="provider" serviceContext="FKRTL"/>}
   </WorkflowModal>}
-  {role==="provider"&&view==="referrals"&&<ProviderReferrals cases={visibleCases} eligibleIds={eligibleReferralIds} selectedId={selectedCaseId} onSelect={id=>{setSelectedCaseId(id);setShowCaseDetail(false)}} onSubmit={submitReferral} onDetail={openCaseDetail} getUnreadCount={unreadFor} onViewLinked={id=>{const child=cases.find(c=>c.id===id);if(child?.providerCode===activeProvider.code)openCaseDetail(id);else setNotice("Episode FKRTL berada di provider tujuan; status approval dan ID-nya sudah tampil pada rujukan.")}}/>}
+  {role==="provider"&&(view==="referrals"||!!referralModalCaseId)&&<ProviderReferrals modalOnly={view!=="referrals"} cases={visibleCases} eligibleIds={eligibleReferralIds} selectedId={referralModalCaseId} onSelect={id=>{setReferralModalCaseId(id);setShowCaseDetail(false)}} onSubmit={submitReferral} onDetail={openCaseDetail} getUnreadCount={unreadFor} onViewLinked={id=>{const child=cases.find(c=>c.id===id);if(child?.providerCode===activeProvider.code)openCaseDetail(id);else setNotice("Episode FKRTL berada di provider tujuan; status approval dan ID-nya sudah tampil pada rujukan.")}}/>}
   {role==="callcenter"&&view==="referrals"&&<CallCenterReferrals cases={cases} onReview={reviewReferral} onDetail={openCaseDetail} getUnreadCount={unreadFor} onViewBenefit={id=>{setSelectedCaseId(id||null);setShowCaseDetail(false)}}/>}
   {role==="callcenter"&&view==="referrals"&&referralMember&&selectedCase?.referral&&<BenefitCoverage key={referralMember.cardNo} member={referralMember} memberActive={isActiveMember(referralMember)} variant="callcenter"/>}
 
