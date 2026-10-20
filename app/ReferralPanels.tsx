@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useState} from "react";
 import {ArrowRight,CheckCircle2,ClipboardCheck,FileText,Search,ShieldCheck,Stethoscope} from "lucide-react";
+import WorkflowModal from "./WorkflowModal";
 
 export type ReferralStatus="Pending Verification"|"Need Revision"|"Approved"|"Rejected";
 export type ReferralDraft={refNumber:string;specialty:string;doctor:string;diagnosis:string;reason:string;documentReference:string};
@@ -15,6 +16,9 @@ export function ProviderReferrals({cases,eligibleIds,selectedId,onSelect,onSubmi
  onDetail:(id:string)=>void;onViewLinked:(id:string)=>void;getUnreadCount?:(id:string)=>number;
 }){
  const selected=cases.find(c=>c.id===selectedId)||null;
+ const [tab,setTab]=useState<"action"|"process"|"history">("action");
+ const referralRows=cases.filter(c=>(c.careLevel||"FKTP")==="FKTP").filter(c=>
+  tab==="action"?eligibleIds.includes(c.id):tab==="process"?!!c.referral&&["Pending Verification","Need Revision"].includes(c.referral.status):!!c.referral&&["Approved","Rejected"].includes(c.referral.status));
  const [refNumber,setRefNumber]=useState("");
  const [specialty,setSpecialty]=useState("");
  const [doctor,setDoctor]=useState("");
@@ -32,9 +36,10 @@ export function ProviderReferrals({cases,eligibleIds,selectedId,onSelect,onSubmi
  return <section className="card referralPanel">
   <div className="sectionHead"><div><h2>Pengajuan Rujukan FKTP → FKRTL</h2><p>FKTP Kimia Farma dapat merujuk ke Hermina; FKTP Hermina dapat melakukan rujukan internal satu atap. Semua rujukan harus disetujui Call Center sebelum pelayanan spesialis.</p></div><span className="countPill">{cases.filter(c=>c.referral).length} rujukan</span></div>
   <div className="referralSteps"><span>1 · Admission FKTP disetujui</span><ArrowRight size={15}/><span>2 · Pengajuan Rujukan</span><ArrowRight size={15}/><span>3 · Verifikasi Call Center</span><ArrowRight size={15}/><span>4 · Admission FKRTL otomatis</span></div>
+  <div className="providerWorklistBar"><div className="providerWorklistTabs" role="group" aria-label="Status rujukan">{([{key:"action",label:"Perlu Tindakan"},{key:"process",label:"Dalam Proses"},{key:"history",label:"Riwayat"}] as const).map(t=><button type="button" key={t.key} aria-pressed={tab===t.key} className={tab===t.key?"selected":""} onClick={()=>setTab(t.key)}>{t.label}</button>)}</div><span className="countPill">{referralRows.length} episode</span></div>
   <div className="referralList">
    <h3>Episode FKTP</h3>
-   {cases.filter(c=>(c.careLevel||"FKTP")==="FKTP").length===0?<p className="referralEmpty">Belum ada episode FKTP. Lakukan Admission FKTP terlebih dahulu.</p>:cases.filter(c=>(c.careLevel||"FKTP")==="FKTP").map(c=><div className="referralRow" key={c.id}>
+   {referralRows.length===0?<p className="referralEmpty">Belum ada episode FKTP. Lakukan Admission FKTP terlebih dahulu.</p>:referralRows.map(c=><div className="referralRow" key={c.id}>
     <div><strong>{c.name}</strong><small>{c.id} · {c.memberId} · {c.status}</small><small>{c.referral?"Rujukan: "+c.referral.status:"Belum ada rujukan"}</small></div>
     <div className="referralRowButtons">
      {eligibleIds.includes(c.id)&&<button className="primary" type="button" onClick={()=>onSelect(c.id)}>{c.referral?.status==="Need Revision"?"Revisi Rujukan":"Buat Rujukan"}</button>}
@@ -43,7 +48,7 @@ export function ProviderReferrals({cases,eligibleIds,selectedId,onSelect,onSubmi
     </div>
    </div>)}
   </div>
-  {selected&&<div className="referralForm"><div className="reviewHead"><div><b>{selected.referral?.status==="Need Revision"?"Revisi Rujukan":"Form Rujukan Baru"}</b><span>{selected.name} · {selected.id} · {target} → RS Hermina Kemayoran (FKRTL)</span></div><button className="reviewClear" onClick={()=>onSelect(null)}>Tutup</button></div>
+  {selected&&<WorkflowModal title={selected.referral?.status==="Need Revision"?"Revisi Rujukan":"Ajukan Rujukan FKTP ke FKRTL"} description={selected.name+" · "+selected.id} onClose={()=>onSelect(null)}><div className="referralForm"><div className="reviewHead"><div><b>{selected.referral?.status==="Need Revision"?"Revisi Rujukan":"Form Rujukan Baru"}</b><span>{selected.name} · {selected.id} · {target} → RS Hermina Kemayoran (FKRTL)</span></div><button className="reviewClear" onClick={()=>onSelect(null)}>Tutup</button></div>
    {!available?<div className="referralWarning">Episode tidak memenuhi syarat pembuatan rujukan FKTP, atau rujukan masih menunggu/sudah diputuskan. Pilih case lain atau lihat status saat ini.</div>:<>
    {selected.referral?.reviewNote&&<div className="referralWarning"><strong>Catatan Call Center:</strong> {selected.referral.reviewNote}</div>}
    <div className="workflowGrid">
@@ -57,9 +62,9 @@ export function ProviderReferrals({cases,eligibleIds,selectedId,onSelect,onSubmi
     <label className="full">Indikasi / Alasan Rujukan *<textarea value={reason} onChange={e=>setReason(e.target.value)} placeholder="Mengapa membutuhkan pemeriksaan spesialis"/></label>
    </div>
    <div className="referralWarning">Prototype ini menyimpan nomor/referensi dokumen, bukan file medis sebenarnya. Pelayanan spesialis menunggu keputusan Approved dari Call Center PertaLife.</div>
-   <div className="workflowActions"><span>Persetujuan rujukan otomatis membuat episode FKRTL tanpa approval Admission kedua.</span><button type="button" className="primary" disabled={!valid} onClick={()=>{onSubmit(selected.id,{refNumber:refNumber.trim(),specialty,doctor:doctor.trim(),diagnosis:diagnosis.trim(),reason:reason.trim(),documentReference:documentReference.trim()});onSelect(null)}}><FileText size={17}/>Submit Rujukan</button></div>
+   <div className="workflowActions"><span>Persetujuan rujukan otomatis membuat episode FKRTL tanpa approval Admission kedua.</span><button type="button" className="primary" disabled={!valid} onClick={()=>{onSubmit(selected.id,{refNumber:refNumber.trim(),specialty,doctor:doctor.trim(),diagnosis:diagnosis.trim(),reason:reason.trim(),documentReference:documentReference.trim()});onSelect(null);setTab("process")}}><FileText size={17}/>Submit Rujukan</button></div>
    </>}
-  </div>}
+  </div></WorkflowModal>}
  </section>;
 }
 
