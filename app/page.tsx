@@ -1175,7 +1175,7 @@ export default function Page(){
     {visibleCases.filter(c=>c.status==="Closed"&&!!c.dischargeRequest&&!c.billing).map(c=><div className="referralRow" key={c.id}><div><strong>{c.name}</strong><small>{c.id} · {c.memberId} · {formatRupiah(c.dischargeRequest?.finalBill||0)}</small></div><div className="referralRowButtons"><button className="primary" onClick={()=>openClaimSubmission(c.id)}><Plus size={15}/>Ajukan Klaim</button><button className="reviewClear" onClick={()=>openCaseDetail(c.id)}><Eye size={15}/>Detail Pasien</button></div></div>)}
    </div>
    <div className="providerOverviewBand"><div><strong>Ajukan Klaim Bundle</strong><p>Pilih beberapa discharge approved dari provider yang sama melalui daftar riwayat.</p></div><button type="button" className="primary" onClick={()=>{setView("history");setSelectedClaimCases([])}}>Pilih Episode Bundle</button></div>
-   <div className="sectionHead"><div><h2>Pengajuan Klaim Provider</h2><p>Daftar nomor pengajuan single dan bundle yang telah dikirim ke PertaLife. Klik nomor untuk melihat peserta, rincian case, dan lampiran.</p></div>
+   <div className="sectionHead"><div><h2>Pengajuan Klaim Provider</h2><p>Daftar nomor pengajuan single dan bundle yang telah dikirim ke PertaLife. Klik nomor untuk membuka pop-up detail case dan lampiran.</p></div>
     <button type="button" className="primary" onClick={()=>{setView("history");setSelectedClaimCases([]);setClaimDraft(null)}}><Plus size={16}/>Buat Pengajuan dari Riwayat Discharge</button>
    </div>
    <div className="claimRegistryStats"><span><b>{providerSubmissions.length}</b> nomor pengajuan</span><span><b>{providerSubmissions.reduce((sum,item)=>sum+item.cases.length,0)}</b> case peserta</span><span><b>{formatRupiah(providerSubmissions.reduce((sum,item)=>sum+item.cases.reduce((a,c)=>a+(c.dischargeRequest?.finalBill||0),0),0))}</b> total nilai</span></div>
@@ -1191,7 +1191,7 @@ export default function Page(){
        <span className="claimRegistryStatus">{item.cases.every(c=>c.billing?.status==="Paid")?"Paid":item.cases.some(c=>c.billing?.status==="Paid")?"Sebagian Paid":item.cases[0]?.billing?.status||"Submitted"}</span>
        <ChevronDown size={18} className={expanded?"claimRegistryChevron open":"claimRegistryChevron"}/>
       </button>
-      {expanded&&<div className="claimRegistryDetail">
+      {expanded&&<WorkflowModal title={"Detail Pengajuan Klaim · "+item.id} description={item.cases.length+" peserta · "+formatRupiah(subtotal)} onClose={()=>setExpandedClaimId(null)}><div className="claimRegistryDetail">
        <div className="claimRegistryMeta"><span><b>Provider:</b> {item.cases[0]?.provider||"-"}</span><span><b>Jenis Pelayanan:</b> {claimTypeSummary(item.cases)}</span><span><b>Metode:</b> Transfer</span></div>
        <div className="tableWrap"><table><thead><tr><th>Case</th><th>Peserta</th><th>Admission / Jenis Klaim</th><th>Diagnosis</th><th>Final Bill</th><th>Aksi</th></tr></thead>
         <tbody>{item.cases.map(c=><tr key={c.id}><td><b>{c.id}</b></td><td><b>{c.name}</b><small>{c.memberId}</small></td><td>{claimTypeFromAdmission(c)}</td><td>{c.dischargeRequest?.finalDiagnosis||"-"}</td><td><b>{formatRupiah(c.dischargeRequest?.finalBill||0)}</b></td><td><button type="button" className="reviewClear" onClick={()=>openCaseDetail(c.id)}><Eye size={15}/>Detail Case</button></td></tr>)}</tbody>
@@ -1200,7 +1200,7 @@ export default function Page(){
         {!item.submission.files?.length?<p>Belum ada file klaim pada nomor pengajuan ini. Pengajuan lama mungkin hanya menyimpan nama file.</p>:
          <div>{item.submission.files.map(file=><button type="button" key={file.id} onClick={()=>downloadStoredAttachment(file)}><FileSpreadsheet size={15}/><span>{file.name}</span><small>{fileSizeLabel(file.size)}</small></button>)}</div>}
        </div>
-      </div>}
+      </div></WorkflowModal>}
      </div>;
     })}</div>}
   </section>}
