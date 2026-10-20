@@ -27,3 +27,13 @@
 .providerWorklistBar .primary{display:inline-flex;align-items:center;gap:6px}
 .providerNextStep{display:block;font-size:11px;color:#1671a9;margin-top:7px;font-weight:650}
 @media(max-width:740px){.providerWorkflowBackdrop{padding:0;align-items:stretch}.providerWorkflowDialog,.providerWorkflowCompact{width:100%;max-height:100dvh;border-radius:0}.providerWorkflowHeader{padding:14px 16px}.providerWorkflowBody{padding:16px 12px 30px}.providerOverview{grid-template-columns:repeat(2,minmax(0,1fr))}.providerOverviewBand{display:block}}
+
+.providerConfirmBackdrop{position:fixed;inset:0;z-index:2500;background:rgba(10,30,51,.7);display:flex;align-items:center;justify-content:center;padding:20px}
+.providerConfirmDialog{max-width:490px;width:100%;border-radius:18px;background:#fff;padding:26px;box-shadow:0 25px 80px rgba(10,31,51,.32)}
+.providerConfirmIcon{width:50px;height:50px;border-radius:14px;background:#e7f4fc;color:#126da9;display:grid;place-items:center;margin-bottom:13px}
+.providerConfirmDialog h2{margin:0 0 9px;color:#153a5c;font-size:20px}
+.providerConfirmDialog p{margin:0 0 22px;color:#61798d;line-height:1.65;font-size:13px}
+.providerConfirmActions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.providerConfirmActions button{padding:11px 15px;border-radius:9px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;border:1px solid #ccdae6;background:#fff;color:#325c79}
+.providerConfirmActions button.primary{background:#087abb;color:white;border-color:#087abb}
+@media(max-width:460px){.providerConfirmActions button{flex:1;justify-content:center}}
