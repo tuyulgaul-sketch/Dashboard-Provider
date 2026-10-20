@@ -62,7 +62,7 @@ export function ProviderReferrals({cases,eligibleIds,selectedId,modalOnly=false,
     <label className="full">Indikasi / Alasan Rujukan *<textarea value={reason} onChange={e=>setReason(e.target.value)} placeholder="Mengapa membutuhkan pemeriksaan spesialis"/></label>
    </div>
    <div className="referralWarning">Prototype ini menyimpan nomor/referensi dokumen, bukan file medis sebenarnya. Pelayanan spesialis menunggu keputusan Approved dari Call Center PertaLife.</div>
-   <div className="workflowActions"><span>Persetujuan rujukan otomatis membuat episode FKRTL tanpa approval Admission kedua.</span><button type="button" className="primary" disabled={!valid} onClick={()=>{onSubmit(selected.id,{refNumber:refNumber.trim(),specialty,doctor:doctor.trim(),diagnosis:diagnosis.trim(),reason:reason.trim(),documentReference:documentReference.trim()});onSelect(null);setTab("process")}}><FileText size={17}/>Submit Rujukan</button></div>
+   <div className="workflowActions"><span>Persetujuan rujukan otomatis membuat episode FKRTL tanpa approval Admission kedua.</span><button type="button" className="primary" disabled={!valid} onClick={()=>{onSubmit(selected.id,{refNumber:refNumber.trim(),specialty,doctor:doctor.trim(),diagnosis:diagnosis.trim(),reason:reason.trim(),documentReference:documentReference.trim()})}}><FileText size={17}/>Submit Rujukan</button></div>
    </>}
   </div></WorkflowModal>}
  </>;
