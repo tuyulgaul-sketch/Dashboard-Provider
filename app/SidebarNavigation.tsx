@@ -8,17 +8,17 @@ type Group={key:string;label:string;icon:typeof Activity;items:Item[]};
 type Props={role:Role;view:string;onNavigate:(view:string,resetFilter?:boolean)=>void;onOpenProviderProfile:()=>void};
 
 const providerGroups:Group[]=[
- {key:"services",label:"Pelayanan Peserta",icon:Stethoscope,items:[
-  {label:"Pendaftaran Peserta",view:"registration",icon:UserRound,resetFilter:true},
-  {label:"Pengajuan Rujukan",view:"referrals",icon:ArrowRight},
+ {key:"service",label:"Operasional Pelayanan",icon:Stethoscope,items:[
+  {label:"Admission Peserta",view:"registration",icon:UserRound,resetFilter:true},
+  {label:"Kunjungan Pasien",view:"cases",icon:Activity,resetFilter:true},
+  {label:"Rujukan",view:"referrals",icon:ArrowRight,resetFilter:true},
   {label:"Treatment Request",view:"treatment",icon:Stethoscope,resetFilter:true},
   {label:"Rawat Inap",view:"inpatient-list",icon:BedDouble,resetFilter:true},
-  {label:"Discharge",view:"discharge",icon:FileCheck2,resetFilter:true},
-  {label:"Case Peserta",view:"cases",icon:Activity,resetFilter:true}
+  {label:"Discharge",view:"discharge",icon:FileCheck2,resetFilter:true}
  ]},
  {key:"finance",label:"Klaim & Riwayat",icon:FileSpreadsheet,items:[
-  {label:"Riwayat Discharge",view:"history",icon:Clock3},
-  {label:"Pengajuan Klaim",view:"claim-list",icon:FileSpreadsheet}
+  {label:"Klaim & Tagihan",view:"claim-list",icon:FileSpreadsheet,resetFilter:true},
+  {label:"Riwayat Pelayanan",view:"history",icon:Clock3,resetFilter:true}
  ]},
  {key:"settings",label:"Pengaturan",icon:Settings,items:[
   {label:"Profile Provider",view:"profile",icon:Building2,profile:true}
