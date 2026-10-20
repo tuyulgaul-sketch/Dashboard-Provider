@@ -1147,6 +1147,12 @@ export default function Page(){
   </section></WorkflowModal>}
 
   {role==="provider"&&view==="claim-list"&&<section className="card claimRegistry">
+   <div className="providerWorklistBar"><div><h2>Siap Diajukan Klaim</h2><p>Daftar peserta yang sudah selesai discharge dan belum pernah diajukan klaim.</p></div><span className="countPill">{visibleCases.filter(c=>c.status==="Closed"&&!!c.dischargeRequest&&!c.billing).length} siap diajukan</span></div>
+   <div className="referralList">
+    {visibleCases.filter(c=>c.status==="Closed"&&!!c.dischargeRequest&&!c.billing).length===0&&<p className="referralEmpty">Tidak ada discharge approved yang menunggu klaim.</p>}
+    {visibleCases.filter(c=>c.status==="Closed"&&!!c.dischargeRequest&&!c.billing).map(c=><div className="referralRow" key={c.id}><div><strong>{c.name}</strong><small>{c.id} · {c.memberId} · {formatRupiah(c.dischargeRequest?.finalBill||0)}</small></div><div className="referralRowButtons"><button className="primary" onClick={()=>openClaimSubmission(c.id)}><Plus size={15}/>Ajukan Klaim</button><button className="reviewClear" onClick={()=>openCaseDetail(c.id)}><Eye size={15}/>Detail Pasien</button></div></div>)}
+   </div>
+   <div className="providerOverviewBand"><div><strong>Ajukan Klaim Bundle</strong><p>Pilih beberapa discharge approved dari provider yang sama melalui daftar riwayat.</p></div><button type="button" className="primary" onClick={()=>{setView("history");setSelectedClaimCases([])}}>Pilih Episode Bundle</button></div>
    <div className="sectionHead"><div><h2>Pengajuan Klaim Provider</h2><p>Daftar nomor pengajuan single dan bundle yang telah dikirim ke PertaLife. Klik nomor untuk melihat peserta, rincian case, dan lampiran.</p></div>
     <button type="button" className="primary" onClick={()=>{setView("history");setSelectedClaimCases([]);setClaimDraft(null)}}><Plus size={16}/>Buat Pengajuan dari Riwayat Discharge</button>
    </div>
