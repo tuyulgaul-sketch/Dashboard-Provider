@@ -218,6 +218,8 @@ export default function Page(){
  const [view,setView]=useState("dashboard"),[notice,setNotice]=useState("");
  const [actionModal,setActionModal]=useState<"admission"|"treatment"|"discharge"|"inpatient-form"|"inpatient-billing"|"claim"|null>(null);
  const [worklistTab,setWorklistTab]=useState<"action"|"process"|"history">("action");
+ const [submitConfirmation,setSubmitConfirmation]=useState<{title:string;detail:string;proceed:()=>void}|null>(null);
+ const confirmationCancelRef=useRef<HTMLButtonElement|null>(null);
  const [selectedCaseId,setSelectedCaseId]=useState<string|null>(null),[showCaseDetail,setShowCaseDetail]=useState(false);
  const [referralModalCaseId,setReferralModalCaseId]=useState<string|null>(null);
  const caseDetailCloseRef=useRef<HTMLButtonElement|null>(null);
@@ -944,6 +946,15 @@ export default function Page(){
   window.addEventListener("keydown",onKey);
   return()=>{document.body.style.overflow=old;window.removeEventListener("keydown",onKey);};
  },[medicalModal]);
+ function requestConfirmation(title:string,detail:string,proceed:()=>void){setSubmitConfirmation({title,detail,proceed});}
+ useEffect(()=>{
+  if(!submitConfirmation)return;
+  const prior=document.activeElement instanceof HTMLElement?document.activeElement:null;
+  confirmationCancelRef.current?.focus();
+  const onKey=(e:KeyboardEvent)=>{if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();setSubmitConfirmation(null);}};
+  document.addEventListener("keydown",onKey,true);
+  return ()=>{document.removeEventListener("keydown",onKey,true);prior?.focus();};
+ },[submitConfirmation]);
  function closeActionModal(){if(uploadBusy)return;setActionModal(null);setSelectedCaseId(null);setAttachmentError("");setClaimFileError("");}
  function renderProviderActions(c:CareCase){
   const all=view==="cases",inpatientView=all||view==="inpatient-list";
@@ -967,7 +978,17 @@ export default function Page(){
   <SidebarNavigation role={role} view={view} onNavigate={(target,resetFilter)=>{setView(target);setActionModal(null);setReferralModalCaseId(null);setWorklistTab(target==="registration"?"process":"action");if(resetFilter)setStatusFilter(null);if(target==="referrals"){setSelectedCaseId(null);setShowCaseDetail(false)}}} onOpenProviderProfile={openProviderProfile}/>
   <div className="sideFoot"><span>Prototype Mode</span><small>Browser data · No production DB</small></div>
  </aside>
- <main>
+ {submitConfirmation&&createPortal(
+   <div className="providerConfirmBackdrop" role="presentation">
+    <div className="providerConfirmDialog" role="alertdialog" aria-modal="true" aria-labelledby="provider-confirm-title" aria-describedby="provider-confirm-desc">
+     <div className="providerConfirmIcon"><ShieldCheck size={25}/></div>
+     <h2 id="provider-confirm-title">{submitConfirmation.title}</h2>
+     <p id="provider-confirm-desc">{submitConfirmation.detail}</p>
+     <div className="providerConfirmActions"><button ref={confirmationCancelRef} type="button" onClick={()=>setSubmitConfirmation(null)}>Periksa Kembali</button>
+      <button className="primary" type="button" onClick={()=>{const run=submitConfirmation.proceed;setSubmitConfirmation(null);run();}}><CheckCircle2 size={16}/>Ya, Kirim Pengajuan</button></div>
+    </div>
+   </div>,document.body)}
+  <main>
   <header><div><h1>{role==="provider"?(view==="dashboard"?"Provider Overview":"Provider Operations"):"Managed Care Command Center"}</h1><p>{role==="provider"?(view==="dashboard"?"Ringkasan pasien, provider, approval PertaLife, dan klaim. Seluruh transaksi melalui sidebar.":"Daftar pasien sesuai tahapan pelayanan; semua pengajuan melalui pop-up."):"Master peserta mengikuti struktur data Managed Care PertaLife."}</p></div><div className="switchWrap"><span className="switchLabel">Account Switcher</span>{unreadTotal>0&&<button type="button" className="caseUnreadGlobal" onClick={()=>{setStatusFilter(null);setView("cases");}} aria-label={unreadTotal+" komentar belum dibaca. Lihat daftar case."}><MessageSquareText size={15}/><span>{unreadTotal} baru</span></button>}<div className="account accountSelector"><div className="avatar">{role==="provider"?<Building2 size={18}/>:<ShieldCheck size={18}/>}</div><div className="accountSelectText"><b>{role==="provider"?activeProvider.name:"Call Center PertaLife"}</b><span>{role==="provider"?activeProvider.code:"Verifier 24/7"}</span></div><select aria-label="Account Switcher" value={role==="callcenter"?"callcenter":activeProvider.code} onChange={e=>{const v=e.target.value;if(v==="callcenter"){setRole("callcenter")}else{setRole("provider");setActiveProviderCode(v as typeof activeProviderCode)}setView("dashboard");setCareAccess("FKTP");setVisitType("Rawat Jalan");setReferralSearch("");setFkrtlBenefitCard(null);setNotice("");setFound(null);setLookupDone(false);setProfileDraft(null);setBankSearch("");setBankOpen(false)}}><option value="callcenter">Call Center PertaLife</option>{providerAccounts.map(p=><option key={p.code} value={p.code}>{p.name} — {p.code}</option>)}</select><ChevronDown size={17}/></div></div></header>
   {notice&&<div className="notice">{notice}</div>}
 
@@ -1082,7 +1103,7 @@ export default function Page(){
     {careAccess==="FKTP"&&!faskesMatch&&active&&<div className="override"><label className="check"><input type="checkbox" checked={urgent} onChange={e=>setUrgent(e.target.checked)}/>Ajukan pengecualian Faskes 1 (butuh verifikasi)</label>{urgent&&<><label>Alasan Urgent<select value={urgencyReason} onChange={e=>setUrgencyReason(e.target.value)}><option value="">Pilih alasan</option>{urgencyOptions.map(x=><option key={x}>{x}</option>)}</select></label>{urgencyReason==="Lainnya"&&<label>Penjelasan<input value={urgencyText} onChange={e=>setUrgencyText(e.target.value)} placeholder="Jelaskan alasan urgency"/></label>}</>}</div>}
     <CaseFilePicker title="Dokumen Pendukung Admission" existing={[]} pending={pendingAdmissionFiles} disabled={uploadBusy} onAdd={files=>addPendingFiles("admission",files)} onRemove={index=>removePendingFile("admission",index)}/>
     {attachmentError&&<div className="caseUploadError" role="alert">{attachmentError}</div>}
-    <div className="admissionBox"><label>{careAccess==="Emergency"?"Hasil Triase / Asesmen Darurat *":"Keluhan / Indikasi *"}<textarea value={complaint} onChange={e=>setComplaint(e.target.value)} placeholder={careAccess==="Emergency"?"Jelaskan kondisi darurat, hasil triase, tanda vital bila ada, dan penanganan awal...":"Jelaskan keluhan utama peserta"}/></label><button className="primary" disabled={!canSubmit||uploadBusy} onClick={submitAdmission}>{careAccess==="Emergency"?"Submit Admission Darurat":"Submit Admission FKTP"} <ArrowRight size={17}/></button>{!active&&<small>Coverage peserta sedang tidak aktif berdasarkan periode INCEPTION/EXPIRY atau START/END DATE.</small>}{careAccess==="Emergency"&&<small>Jalur emergency mengikuti asesmen kegawatdaruratan. Admission tetap diverifikasi Call Center; penanganan pasien tidak ditunda.</small>}{careAccess==="FKTP"&&active&&!faskesMatch&&!urgent&&<small>{faskesMapped?"Submit terkunci karena Faskes 1 tidak sesuai.":"Submit normal terkunci karena Faskes 1 belum dimapping."} Aktifkan permintaan pengecualian jika diperlukan; Call Center tetap harus memverifikasi.</small>}</div>
+    <div className="admissionBox"><label>{careAccess==="Emergency"?"Hasil Triase / Asesmen Darurat *":"Keluhan / Indikasi *"}<textarea value={complaint} onChange={e=>setComplaint(e.target.value)} placeholder={careAccess==="Emergency"?"Jelaskan kondisi darurat, hasil triase, tanda vital bila ada, dan penanganan awal...":"Jelaskan keluhan utama peserta"}/></label><button className="primary" disabled={!canSubmit||uploadBusy} onClick={()=>requestConfirmation("Konfirmasi Admission","Pastikan kepesertaan, Faskes 1, dan keluhan pasien sudah benar. Pengajuan akan menunggu verifikasi Call Center PertaLife.",()=>{void submitAdmission();})}>{careAccess==="Emergency"?"Submit Admission Darurat":"Submit Admission FKTP"} <ArrowRight size={17}/></button>{!active&&<small>Coverage peserta sedang tidak aktif berdasarkan periode INCEPTION/EXPIRY atau START/END DATE.</small>}{careAccess==="Emergency"&&<small>Jalur emergency mengikuti asesmen kegawatdaruratan. Admission tetap diverifikasi Call Center; penanganan pasien tidak ditunda.</small>}{careAccess==="FKTP"&&active&&!faskesMatch&&!urgent&&<small>{faskesMapped?"Submit terkunci karena Faskes 1 tidak sesuai.":"Submit normal terkunci karena Faskes 1 belum dimapping."} Aktifkan permintaan pengecualian jika diperlukan; Call Center tetap harus memverifikasi.</small>}</div>
    </div>}
    </>}
   </section>
@@ -1103,11 +1124,11 @@ export default function Page(){
 
   {role==="provider"&&actionModal==="inpatient-form"&&selectedCase&&inpatientHospital(selectedCase)&&!selectedCase.inpatient&&
    <WorkflowModal title="Ajukan Rawat Inap" description={selectedCase.id+" · "+selectedCase.name+" · Menunggu persetujuan Call Center"} onClose={closeActionModal}><InpatientRequestForm key={selectedCase.id} patient={inpatientPatient(selectedCase)}
-    onSubmit={submitInpatientRequest} onCancel={closeActionModal}/></WorkflowModal>}
+    onSubmit={form=>requestConfirmation("Konfirmasi Rawat Inap","Periksa diagnosis, indikasi medis, kelas kamar, lama rawat, dan pengesahan dokter. Pengajuan akan menunggu approval Call Center.",()=>submitInpatientRequest(form))} onCancel={closeActionModal}/></WorkflowModal>}
 
   {role==="provider"&&actionModal==="inpatient-billing"&&selectedCase?.inpatient?.state==="Active"&&
    <WorkflowModal title="Ajukan Discharge Rawat Inap" description={selectedCase.id+" · "+selectedCase.name+" · Review perhitungan pulang"} onClose={closeActionModal} busy={uploadBusy}><InpatientBillingForm key={selectedCase.id} patient={inpatientPatient(selectedCase)} episode={selectedCase.inpatient}
-    disabled={uploadBusy} onSubmit={submitInpatientBilling} onCancel={closeActionModal}
+    disabled={uploadBusy} onSubmit={bill=>requestConfirmation("Konfirmasi Discharge Rawat Inap","Pastikan final diagnosis, rincian biaya dan lampiran bukti tagihan benar sebelum dikirim ke PertaLife.",()=>{void submitInpatientBilling(bill);})} onCancel={closeActionModal}
     uploadSlot={<div className="inpatientRequiredReceipt">
      <h3>5. Bukti Tagihan Rawat Inap (Wajib)</h3>
      <p>Lampirkan kwitansi, rincian biaya, atau bukti tagihan pendukung. Mengikuti kuota lampiran case existing: maksimum 10 file dengan total 10 MB.</p>
@@ -1127,7 +1148,7 @@ export default function Page(){
    <div className="treatmentReasonCard"><div><b>Alasan / Dasar Pemberian Treatment *</b><span>Jelaskan pertimbangan klinis mengapa obat, pemeriksaan, atau tindakan ini diperlukan.</span></div><textarea value={treatmentReason} onChange={e=>setTreatmentReason(e.target.value)} placeholder="Contoh: berdasarkan diagnosis dan hasil pemeriksaan awal, diperlukan ..."/></div>
    <div className="treatmentUploadCard"><CaseFilePicker title="Dokumen Pendukung Treatment" existing={selectedCase.files||[]} pending={pendingTreatmentFiles} disabled={uploadBusy} onAdd={files=>addPendingFiles("treatment",files)} onRemove={index=>removePendingFile("treatment",index)}/></div>
    {attachmentError&&<div className="caseUploadError" role="alert">{attachmentError}</div>}
-   <div className="workflowActions"><span>Request ini akan masuk ke Waiting Treatment Approval.</span><button className="primary" disabled={uploadBusy||!treatmentDiagnosis.trim()||!treatmentProcedure.trim()||!treatmentReason.trim()||!treatmentCost.trim()} onClick={submitTreatment}>Submit Treatment Request <ArrowRight size={17}/></button></div>
+   <div className="workflowActions"><span>Request ini akan masuk ke Waiting Treatment Approval.</span><button className="primary" disabled={uploadBusy||!treatmentDiagnosis.trim()||!treatmentProcedure.trim()||!treatmentReason.trim()||!treatmentCost.trim()} onClick={()=>requestConfirmation("Konfirmasi Treatment","Request ini akan masuk ke antrean verifikasi medis dan biaya Call Center PertaLife.",()=>{void submitTreatment();})}>Submit Treatment Request <ArrowRight size={17}/></button></div>
   </section></WorkflowModal>}
 
   {role==="provider"&&actionModal==="discharge"&&selectedCase&&<WorkflowModal title="Ajukan Discharge Rawat Jalan" description={selectedCase.id+" · "+selectedCase.name} onClose={closeActionModal} busy={uploadBusy}><section className="card workflowForm">
@@ -1144,7 +1165,7 @@ export default function Page(){
     {!pendingDischargeFiles.length&&<small className="dischargeBillHint">Tambahkan minimal 1 file sebagai dasar tagihan. Total seluruh lampiran case tetap maksimal 10 file / 10 MB.</small>}
     {attachmentError&&<div className="caseUploadError" role="alert">{attachmentError}</div>}
    </div>
-   <div className="workflowActions"><span>Discharge beserta bukti tagihan akan diverifikasi Call Center sebelum Final Discharge Approved.</span><button className="primary" disabled={uploadBusy||!finalDiagnosis.trim()||!finalBill.trim()||parseAmount(finalBill)<=0||!pendingDischargeFiles.length} onClick={submitDischarge}>{uploadBusy?"Menyimpan Bukti Tagihan...":"Submit Discharge"} <ArrowRight size={17}/></button></div>
+   <div className="workflowActions"><span>Discharge beserta bukti tagihan akan diverifikasi Call Center sebelum Final Discharge Approved.</span><button className="primary" disabled={uploadBusy||!finalDiagnosis.trim()||!finalBill.trim()||parseAmount(finalBill)<=0||!pendingDischargeFiles.length} onClick={()=>requestConfirmation("Konfirmasi Discharge","Final bill, diagnosis, dan lampiran akan dikirim untuk persetujuan Call Center PertaLife.",()=>{void submitDischarge();})}>{uploadBusy?"Menyimpan Bukti Tagihan...":"Submit Discharge"} <ArrowRight size={17}/></button></div>
   </section></WorkflowModal>}
 
   {role==="provider"&&view==="claim-list"&&<section className="card claimRegistry">
@@ -1225,7 +1246,7 @@ export default function Page(){
      <td><input type="checkbox" checked={d.submitted} aria-label={"Tersedia: "+d.label} onChange={e=>{const docs=claimDraft.documents.map((x,j)=>j===i?{...x,submitted:e.target.checked}:x);setClaimDraft({...claimDraft,documents:docs})}}/></td>
     </tr>)}</tbody></table>
    </div>
-   <div className="workflowActions"><span>Total Bundle yang diajukan: <b>{formatRupiah(claimDraft.bundleTotalBill||selectedCase.dischargeRequest?.finalBill||0)}</b></span><button className="primary" disabled={uploadBusy} onClick={submitClaim}>{uploadBusy?"Menyimpan Lampiran...":"Submit Klaim ke PertaLife"} <ArrowRight size={17}/></button></div>
+   <div className="workflowActions"><span>Total Bundle yang diajukan: <b>{formatRupiah(claimDraft.bundleTotalBill||selectedCase.dischargeRequest?.finalBill||0)}</b></span><button className="primary" disabled={uploadBusy} onClick={()=>requestConfirmation("Konfirmasi Klaim Provider","Periksa rekening tujuan, data peserta, serta kelengkapan dokumen. Klik Kirim untuk meneruskan klaim ke PertaLife.",()=>{void submitClaim();})}>{uploadBusy?"Menyimpan Lampiran...":"Submit Klaim ke PertaLife"} <ArrowRight size={17}/></button></div>
   </section></WorkflowModal>}
 
   {view==="claim"&&selectedCase&&role==="callcenter"&&selectedCase.claimSubmission&&<section className="card claimForm">
@@ -1250,7 +1271,7 @@ export default function Page(){
      <div className="medicalApprovalHeading"><div><h2 id="extend-title">Konfirmasi Alasan Extend Rawat Inap</h2>
       <p>{cases.find(c=>c.id===extendCaseId)?.name} · {extendCaseId}</p></div>
       <button className="reviewClear" type="button" onClick={()=>setExtendCaseId(null)}><X size={16}/> Tutup</button></div>
-     <form className="medicalApprovalForm" onSubmit={e=>{e.preventDefault();submitInpatientExtension()}}>
+     <form className="medicalApprovalForm" onSubmit={e=>{e.preventDefault();requestConfirmation("Konfirmasi Extend Rawat Inap","Alasan perpanjangan akan dikirim ke Call Center untuk menentukan hari tambahan yang dijamin.",submitInpatientExtension)}}>
       <p className="inpatientNote">Perpanjangan tidak memerlukan pengisian ulang Form Rawat Inap. Call Center akan menentukan jumlah hari tambahan yang disetujui.</p>
       <label>Alasan Medis Perpanjangan Rawat Inap *<textarea autoFocus required minLength={5} rows={5} value={extendReason}
        onChange={e=>setExtendReason(e.target.value)} placeholder="Kondisi terkini dan alasan pasien masih membutuhkan rawat inap..."/></label>
