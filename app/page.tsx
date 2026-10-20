@@ -216,7 +216,7 @@ export default function Page(){
  const [fkrtlBenefitCard,setFkrtlBenefitCard]=useState<string|null>(null);
  const [urgent,setUrgent]=useState(false),[urgencyReason,setUrgencyReason]=useState(""),[urgencyText,setUrgencyText]=useState(""),[complaint,setComplaint]=useState("");
  const [view,setView]=useState("dashboard"),[notice,setNotice]=useState("");
- const [actionModal,setActionModal]=useState<"admission"|"treatment"|"discharge"|"inpatient-form"|"inpatient-billing"|"claim"|null>(null);
+ const [actionModal,setActionModal]=useState<"admission"|"treatment"|"discharge"|"inpatient-form"|"inpatient-billing"|"bundle-picker"|"claim"|null>(null);
  const [worklistTab,setWorklistTab]=useState<"action"|"process"|"history">("action");
  const [submitConfirmation,setSubmitConfirmation]=useState<{title:string;detail:string;proceed:()=>void}|null>(null);
  const confirmationCancelRef=useRef<HTMLButtonElement|null>(null);
@@ -1174,9 +1174,9 @@ export default function Page(){
     {visibleCases.filter(c=>c.status==="Closed"&&!!c.dischargeRequest&&!c.billing).length===0&&<p className="referralEmpty">Tidak ada discharge approved yang menunggu klaim.</p>}
     {visibleCases.filter(c=>c.status==="Closed"&&!!c.dischargeRequest&&!c.billing).map(c=><div className="referralRow" key={c.id}><div><strong>{c.name}</strong><small>{c.id} · {c.memberId} · {formatRupiah(c.dischargeRequest?.finalBill||0)}</small></div><div className="referralRowButtons"><button className="primary" onClick={()=>openClaimSubmission(c.id)}><Plus size={15}/>Ajukan Klaim</button><button className="reviewClear" onClick={()=>openCaseDetail(c.id)}><Eye size={15}/>Detail Pasien</button></div></div>)}
    </div>
-   <div className="providerOverviewBand"><div><strong>Ajukan Klaim Bundle</strong><p>Pilih beberapa discharge approved dari provider yang sama melalui daftar riwayat.</p></div><button type="button" className="primary" onClick={()=>{setView("history");setSelectedClaimCases([])}}>Pilih Episode Bundle</button></div>
+   <div className="providerOverviewBand"><div><strong>Ajukan Klaim Bundle</strong><p>Pilih beberapa discharge approved dari provider yang sama melalui daftar riwayat.</p></div><button type="button" className="primary" onClick={()=>{setSelectedClaimCases([]);setActionModal("bundle-picker")}}>Pilih Episode Bundle</button></div>
    <div className="sectionHead"><div><h2>Pengajuan Klaim Provider</h2><p>Daftar nomor pengajuan single dan bundle yang telah dikirim ke PertaLife. Klik nomor untuk membuka pop-up detail case dan lampiran.</p></div>
-    <button type="button" className="primary" onClick={()=>{setView("history");setSelectedClaimCases([]);setClaimDraft(null)}}><Plus size={16}/>Buat Pengajuan dari Riwayat Discharge</button>
+    <button type="button" className="primary" onClick={()=>{setSelectedClaimCases([]);setClaimDraft(null);setActionModal("bundle-picker")}}><Plus size={16}/>Buat Pengajuan Bundle</button>
    </div>
    <div className="claimRegistryStats"><span><b>{providerSubmissions.length}</b> nomor pengajuan</span><span><b>{providerSubmissions.reduce((sum,item)=>sum+item.cases.length,0)}</b> case peserta</span><span><b>{formatRupiah(providerSubmissions.reduce((sum,item)=>sum+item.cases.reduce((a,c)=>a+(c.dischargeRequest?.finalBill||0),0),0))}</b> total nilai</span></div>
    {providerSubmissions.length===0?<div className="claimRegistryEmpty"><FileSpreadsheet size={28}/><b>Belum ada pengajuan klaim</b><p>Setelah discharge disetujui, buat pengajuan single atau bundle dari menu Riwayat Discharge. Nomor pengajuan akan muncul di sini.</p></div>:
@@ -1205,6 +1205,16 @@ export default function Page(){
     })}</div>}
   </section>}
 
+  {role==="provider"&&actionModal==="bundle-picker"&&<WorkflowModal title="Pilih Episode untuk Klaim Bundle" description="Pilih discharge approved yang belum diajukan klaim. Semua case harus berasal dari provider yang sama." onClose={closeActionModal}>
+   <section className="card claimRegistry">
+    <div className="sectionHead"><div><h2>Episode Siap Klaim</h2><p>Daftar yang dapat dimasukkan ke pengajuan bundle.</p></div><span className="countPill">{selectedClaimCases.length} dipilih</span></div>
+    <div className="referralList">
+     {visibleCases.filter(c=>c.status==="Closed"&&!!c.dischargeRequest&&!c.billing).length===0&&<p className="referralEmpty">Belum ada discharge yang eligible untuk pengajuan klaim.</p>}
+     {visibleCases.filter(c=>c.status==="Closed"&&!!c.dischargeRequest&&!c.billing).map(c=><label className="referralRow" key={c.id} style={{cursor:"pointer"}}><div><strong>{c.name}</strong><small>{c.id} · {c.memberId} · {formatRupiah(c.dischargeRequest?.finalBill||0)}</small></div><input type="checkbox" checked={selectedClaimCases.includes(c.id)} onChange={()=>toggleClaimCase(c.id)} aria-label={"Pilih klaim "+c.name}/></label>)}
+    </div>
+    <div className="workflowActions"><span>Total dipilih: <b>{formatRupiah(visibleCases.filter(c=>selectedClaimCases.includes(c.id)).reduce((total,c)=>total+(c.dischargeRequest?.finalBill||0),0))}</b></span><button type="button" className="primary" disabled={!selectedClaimCases.length} onClick={()=>openClaimBundle(selectedClaimCases)}>Lanjut Isi Klaim <ArrowRight size={16}/></button></div>
+   </section>
+  </WorkflowModal>}
   {actionModal==="claim"&&selectedCase&&role==="provider"&&claimDraft&&<WorkflowModal title="Ajukan Klaim Provider" description={selectedCase.id+" · "+(claimDraft.bundleCaseIds?.length||1)+" episode"} onClose={closeActionModal} busy={uploadBusy}><section className="card claimForm">
    <div className="sectionHead"><div><h2>Pengajuan Klaim Pembayaran</h2><p>{claimDraft.bundleId||selectedCase.id} · {claimDraft.bundleCaseIds?.length||1} case · Total {formatRupiah(claimDraft.bundleTotalBill||selectedCase.dischargeRequest?.finalBill||0)}</p></div><button className="reviewClear" onClick={()=>{setClaimDraft(null);closeActionModal()}}><X size={15}/> Batal</button></div>
    {claimDraft.bundleCaseIds&&<div className="bundleSummary"><b>Case dalam Bundle</b><div className="tableWrap"><table><thead><tr><th>Case</th><th>Peserta</th><th>Diagnosis</th><th>Final Bill</th></tr></thead><tbody>{claimDraft.bundleCaseIds.map(id=>{const bc=cases.find(x=>x.id===id);return bc?<tr key={id}><td>{bc.id}</td><td><b>{bc.name}</b><small>{bc.memberId}</small></td><td>{bc.dischargeRequest?.finalDiagnosis||"-"}</td><td><b>{formatRupiah(bc.dischargeRequest?.finalBill||0)}</b></td></tr>:null})}</tbody></table></div></div>}
