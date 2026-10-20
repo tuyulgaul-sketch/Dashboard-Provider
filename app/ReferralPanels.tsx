@@ -10,8 +10,8 @@ export type ReferralRow={id:string;name:string;memberId:string;provider:string;p
 const HERM="PRV-HERMINA-KMY-001";
 const specialties=["Penyakit Dalam","Anak","Obgyn","Bedah","Ortopedi","Jantung","Mata","THT","Saraf","Kulit & Kelamin","Gigi Spesialis","Lainnya"];
 
-export function ProviderReferrals({cases,eligibleIds,selectedId,onSelect,onSubmit,onDetail,onViewLinked,getUnreadCount}:{
- cases:ReferralRow[];eligibleIds:string[];selectedId:string|null;
+export function ProviderReferrals({cases,eligibleIds,selectedId,modalOnly=false,onSelect,onSubmit,onDetail,onViewLinked,getUnreadCount}:{
+ cases:ReferralRow[];eligibleIds:string[];selectedId:string|null;modalOnly?:boolean;
  onSelect:(id:string|null)=>void;onSubmit:(id:string,draft:ReferralDraft)=>void;
  onDetail:(id:string)=>void;onViewLinked:(id:string)=>void;getUnreadCount?:(id:string)=>number;
 }){
@@ -33,7 +33,7 @@ export function ProviderReferrals({cases,eligibleIds,selectedId,onSelect,onSubmi
  const available=selected&&eligibleIds.includes(selected.id);
  const target=selected?.providerCode===HERM?"Internal (Satu Atap)":"Eksternal";
  const valid=!!refNumber.trim()&&!!specialty.trim()&&!!doctor.trim()&&!!diagnosis.trim()&&!!reason.trim()&&!!documentReference.trim();
- return <section className="card referralPanel">
+ return <>{!modalOnly&&<section className="card referralPanel">
   <div className="sectionHead"><div><h2>Pengajuan Rujukan FKTP → FKRTL</h2><p>FKTP Kimia Farma dapat merujuk ke Hermina; FKTP Hermina dapat melakukan rujukan internal satu atap. Semua rujukan harus disetujui Call Center sebelum pelayanan spesialis.</p></div><span className="countPill">{cases.filter(c=>c.referral).length} rujukan</span></div>
   <div className="referralSteps"><span>1 · Admission FKTP disetujui</span><ArrowRight size={15}/><span>2 · Pengajuan Rujukan</span><ArrowRight size={15}/><span>3 · Verifikasi Call Center</span><ArrowRight size={15}/><span>4 · Admission FKRTL otomatis</span></div>
   <div className="providerWorklistBar"><div className="providerWorklistTabs" role="group" aria-label="Status rujukan">{([{key:"action",label:"Perlu Tindakan"},{key:"process",label:"Dalam Proses"},{key:"history",label:"Riwayat"}] as const).map(t=><button type="button" key={t.key} aria-pressed={tab===t.key} className={tab===t.key?"selected":""} onClick={()=>setTab(t.key)}>{t.label}</button>)}</div><span className="countPill">{referralRows.length} episode</span></div>
@@ -47,7 +47,7 @@ export function ProviderReferrals({cases,eligibleIds,selectedId,onSelect,onSubmi
      <button type="button" className="reviewClear" onClick={()=>onDetail(c.id)}>Detail FKTP{(getUnreadCount?.(c.id)||0)>0&&<span className="caseUnreadBadge referralUnreadCount">{getUnreadCount?.(c.id)}</span>}</button>
     </div>
    </div>)}
-  </div>
+  </div></section>}
   {selected&&<WorkflowModal title={selected.referral?.status==="Need Revision"?"Revisi Rujukan":"Ajukan Rujukan FKTP ke FKRTL"} description={selected.name+" · "+selected.id} onClose={()=>onSelect(null)}><div className="referralForm"><div className="reviewHead"><div><b>{selected.referral?.status==="Need Revision"?"Revisi Rujukan":"Form Rujukan Baru"}</b><span>{selected.name} · {selected.id} · {target} → RS Hermina Kemayoran (FKRTL)</span></div><button className="reviewClear" onClick={()=>onSelect(null)}>Tutup</button></div>
    {!available?<div className="referralWarning">Episode tidak memenuhi syarat pembuatan rujukan FKTP, atau rujukan masih menunggu/sudah diputuskan. Pilih case lain atau lihat status saat ini.</div>:<>
    {selected.referral?.reviewNote&&<div className="referralWarning"><strong>Catatan Call Center:</strong> {selected.referral.reviewNote}</div>}
@@ -65,7 +65,7 @@ export function ProviderReferrals({cases,eligibleIds,selectedId,onSelect,onSubmi
    <div className="workflowActions"><span>Persetujuan rujukan otomatis membuat episode FKRTL tanpa approval Admission kedua.</span><button type="button" className="primary" disabled={!valid} onClick={()=>{onSubmit(selected.id,{refNumber:refNumber.trim(),specialty,doctor:doctor.trim(),diagnosis:diagnosis.trim(),reason:reason.trim(),documentReference:documentReference.trim()});onSelect(null);setTab("process")}}><FileText size={17}/>Submit Rujukan</button></div>
    </>}
   </div></WorkflowModal>}
- </section>;
+ </>;
 }
 
 export function CallCenterReferrals({cases,onReview,onDetail,onViewBenefit,getUnreadCount}:{
