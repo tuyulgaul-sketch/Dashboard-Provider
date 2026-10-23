@@ -8,7 +8,7 @@ export const ADMISSION_FILE_ACCEPT=".pdf,.jpg,.jpeg,.png";
 const DB_NAME="pertalife-case-attachments-v1",STORE="files";
 export type CaseFileMeta={
  id:string;caseId:string;name:string;size:number;type:string;addedAt:number;
- origin:"admission"|"comment"|"treatment"|"discharge"|"claim";commentId?:string;
+ origin:"admission"|"comment"|"treatment"|"inpatient"|"discharge"|"claim";commentId?:string;
 };
 type FileRecord={id:string;blob:Blob};
 export function fileSizeLabel(bytes:number){
