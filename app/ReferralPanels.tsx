@@ -19,7 +19,6 @@ export function ProviderReferrals({cases,eligibleIds,selectedId,modalOnly=false,
  const [tab,setTab]=useState<"action"|"process"|"history">("action");
  const referralRows=cases.filter(c=>(c.careLevel||"FKTP")==="FKTP").filter(c=>
   tab==="action"?eligibleIds.includes(c.id):tab==="process"?!!c.referral&&["Pending Verification","Need Revision"].includes(c.referral.status):!!c.referral&&["Approved","Rejected"].includes(c.referral.status));
- const [refNumber,setRefNumber]=useState("");
  const [specialty,setSpecialty]=useState("");
  const [doctor,setDoctor]=useState("");
  const [diagnosis,setDiagnosis]=useState("");
@@ -27,12 +26,12 @@ export function ProviderReferrals({cases,eligibleIds,selectedId,modalOnly=false,
  const [documentReference,setDocumentReference]=useState("");
  useEffect(()=>{
   const prev=selected?.referral;
-  setRefNumber(prev?.refNumber||"");setSpecialty(prev?.specialty||"");setDoctor(prev?.doctor||"");
+  setSpecialty(prev?.specialty||"");setDoctor(prev?.doctor||"");
   setDiagnosis(prev?.diagnosis||"");setReason(prev?.reason||"");setDocumentReference(prev?.documentReference||"");
  },[selected?.id,selected?.referral?.submittedAt]);
  const available=selected&&eligibleIds.includes(selected.id);
  const target=selected?.providerCode===HERM?"Internal (Satu Atap)":"Eksternal";
- const valid=!!refNumber.trim()&&!!specialty.trim()&&!!doctor.trim()&&!!diagnosis.trim()&&!!reason.trim()&&!!documentReference.trim();
+ const valid=!!specialty.trim()&&!!doctor.trim()&&!!diagnosis.trim()&&!!reason.trim();
  return <>{!modalOnly&&<section className="card referralPanel">
   <div className="sectionHead"><div><h2>Pengajuan Rujukan FKTP → FKRTL</h2><p>FKTP Kimia Farma dapat merujuk ke Hermina; FKTP Hermina dapat melakukan rujukan internal satu atap. Semua rujukan harus disetujui Call Center sebelum pelayanan spesialis.</p></div><span className="countPill">{cases.filter(c=>c.referral).length} rujukan</span></div>
   <div className="referralSteps"><span>1 · Admission FKTP disetujui</span><ArrowRight size={15}/><span>2 · Pengajuan Rujukan</span><ArrowRight size={15}/><span>3 · Verifikasi Call Center</span><ArrowRight size={15}/><span>4 · Admission FKRTL otomatis</span></div>
@@ -40,7 +39,7 @@ export function ProviderReferrals({cases,eligibleIds,selectedId,modalOnly=false,
   <div className="referralList">
    <h3>Episode FKTP</h3>
    {referralRows.length===0?<p className="referralEmpty">Belum ada episode FKTP. Lakukan Admission FKTP terlebih dahulu.</p>:referralRows.map(c=><div className="referralRow" key={c.id}>
-    <div><strong>{c.name}</strong><small>{c.id} · {c.memberId} · {c.status}</small><small>{c.referral?"Rujukan: "+c.referral.status:"Belum ada rujukan"}</small></div>
+    <div><strong>{c.name}</strong><small>{c.id} · {c.memberId} · {c.status}</small><small>{c.referral?"Rujukan "+c.referral.refNumber+" · "+c.referral.status:"Belum ada rujukan"}</small></div>
     <div className="referralRowButtons">
      {eligibleIds.includes(c.id)&&<button className="primary" type="button" onClick={()=>onSelect(c.id)}>{c.referral?.status==="Need Revision"?"Revisi Rujukan":"Buat Rujukan"}</button>}
      {c.referral?.linkedCaseId&&<button type="button" className="reviewClear" onClick={()=>onViewLinked(c.referral!.linkedCaseId!)}>Lihat FKRTL</button>}
@@ -52,17 +51,17 @@ export function ProviderReferrals({cases,eligibleIds,selectedId,modalOnly=false,
    {!available?<div className="referralWarning">Episode tidak memenuhi syarat pembuatan rujukan FKTP, atau rujukan masih menunggu/sudah diputuskan. Pilih case lain atau lihat status saat ini.</div>:<>
    {selected.referral?.reviewNote&&<div className="referralWarning"><strong>Catatan Call Center:</strong> {selected.referral.reviewNote}</div>}
    <div className="workflowGrid">
-    <label>Nomor Rujukan *<input value={refNumber} onChange={e=>setRefNumber(e.target.value)} placeholder="Nomor surat / referensi internal"/></label>
+    <label>Nomor Rujukan (otomatis)<input value={selected.referral?.refNumber||"Dibuat oleh sistem saat pengajuan"} readOnly/></label>
     <label>Jenis Rujukan<input readOnly value={target}/></label>
     <label>Faskes Tujuan<input readOnly value="RS Hermina Kemayoran — FKRTL"/></label>
     <label>Poli / Spesialis Tujuan *<select value={specialty} onChange={e=>setSpecialty(e.target.value)}><option value="">Pilih spesialis</option>{specialties.map(x=><option key={x}>{x}</option>)}</select></label>
     <label>Dokter FKTP Perujuk *<input value={doctor} onChange={e=>setDoctor(e.target.value)} placeholder="Nama dokter FKTP"/></label>
-    <label>Referensi Dokumen Medis *<input value={documentReference} onChange={e=>setDocumentReference(e.target.value)} placeholder="Nomor berkas / catatan lokasi dokumen"/></label>
+    <label>Referensi Dokumen Medis (Opsional)<input value={documentReference} onChange={e=>setDocumentReference(e.target.value)} placeholder="Nomor berkas / catatan lokasi dokumen"/></label>
     <label className="full">Diagnosis Awal *<textarea value={diagnosis} onChange={e=>setDiagnosis(e.target.value)} placeholder="Diagnosis atau dugaan diagnosis dari pemeriksaan FKTP"/></label>
     <label className="full">Indikasi / Alasan Rujukan *<textarea value={reason} onChange={e=>setReason(e.target.value)} placeholder="Mengapa membutuhkan pemeriksaan spesialis"/></label>
    </div>
    <div className="referralWarning">Prototype ini menyimpan nomor/referensi dokumen, bukan file medis sebenarnya. Pelayanan spesialis menunggu keputusan Approved dari Call Center PertaLife.</div>
-   <div className="workflowActions"><span>Persetujuan rujukan otomatis membuat episode FKRTL tanpa approval Admission kedua.</span><button type="button" className="primary" disabled={!valid} onClick={()=>{onSubmit(selected.id,{refNumber:refNumber.trim(),specialty,doctor:doctor.trim(),diagnosis:diagnosis.trim(),reason:reason.trim(),documentReference:documentReference.trim()})}}><FileText size={17}/>Submit Rujukan</button></div>
+   <div className="workflowActions"><span>Persetujuan rujukan otomatis membuat episode FKRTL tanpa approval Admission kedua.</span><button type="button" className="primary" disabled={!valid} onClick={()=>{onSubmit(selected.id,{refNumber:"",specialty,doctor:doctor.trim(),diagnosis:diagnosis.trim(),reason:reason.trim(),documentReference:documentReference.trim()})}}><FileText size={17}/>Submit Rujukan</button></div>
    </>}
   </div></WorkflowModal>}
  </>;
