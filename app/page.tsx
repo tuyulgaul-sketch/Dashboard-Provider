@@ -981,10 +981,30 @@ export default function Page(){
  function advanceBilling(id:string,status:"Under Verification"|"Approved"|"Scheduled for Payment"|"Paid"){
   const at=Date.now();setCases(v=>v.map(c=>c.id===id&&c.billing?withHistory({...c,billing:{...c.billing,status,updatedAt:at}},"Payment Status Updated","PertaLife",status,at):c));
  }
+ function treatmentVersions(c:CareCase):TreatmentPriceVersion[]{
+  if(c.treatmentPricing?.versions?.length)return c.treatmentPricing.versions;
+  if(!c.treatmentRequest)return [];
+  return [{version:1,amount:c.treatmentRequest.estimatedCost,at:c.treatmentRequest.submittedAt,actor:c.provider,note:"Estimasi awal Provider (data sebelumnya)"}];
+ }
  function approveMedical(id:string,stage:"Treatment"|"Discharge"){
   const current=cases.find(c=>c.id===id);
   if(role!=="callcenter"||!current||current.status!==(stage==="Treatment"?"Waiting Treatment Approval":"Waiting Discharge"))return;
-  setMedicalModal({caseId:id,stage});setMedicalDoctor("");setMedicalNote("");setMedicalPrice(stage==="Treatment"?formatAmountInput(String(current.treatmentPricing?.versions.at(-1)?.amount??current.treatmentRequest?.estimatedCost??0)):"");setDischargeEvidenceReviewed(false);setShowCaseDetail(false);
+  setMedicalModal({caseId:id,stage});setMedicalDoctor("");setMedicalNote("");
+  setMedicalPrice(stage==="Treatment"?formatAmountInput(String(treatmentVersions(current).at(-1)?.amount||0)):"");
+  setDischargeEvidenceReviewed(false);setShowCaseDetail(false);
+ }
+ function saveTreatmentPriceRevision(){
+  if(role!=="callcenter"||!medicalModal||medicalModal.stage!=="Treatment"||!medicalDoctor.trim()||!medicalNote.trim())return;
+  const current=cases.find(c=>c.id===medicalModal.caseId);
+  if(!current||current.status!=="Waiting Treatment Approval")return;
+  const amount=parseAmount(medicalPrice),versions=treatmentVersions(current),previous=versions.at(-1);
+  if(amount<=0){setNotice("Nilai revisi harga harus lebih dari Rp 0.");return;}
+  if(previous?.amount===amount){setNotice("Nilai harga sama dengan versi terakhir. Tidak ada revisi baru.");return;}
+  const at=Date.now(),doctor=medicalDoctor.trim(),note=medicalNote.trim();
+  const next:TreatmentPriceVersion={version:versions.length+1,amount,at,actor:"dr. "+doctor+" / PertaLife",note};
+  setCases(cs=>cs.map(c=>c.id===current.id?withHistory({...c,treatmentPricing:{...c.treatmentPricing,versions:[...treatmentVersions(c),next]}},"Treatment Price Revised (V"+next.version+")",next.actor,formatRupiah(amount)+" · "+note,at):c));
+  setMedicalNote("");
+  setNotice("Revisi biaya V"+next.version+" tersimpan. Case tetap menunggu Final Approval PLI/Internal.");
  }
  function submitMedicalApproval(){
   if(!medicalModal||!medicalDoctor.trim()||!medicalNote.trim()||role!=="callcenter")return;
@@ -997,14 +1017,40 @@ export default function Page(){
   if(stage==="Discharge"&&c?.dischargeRequest?.fileIds?.length&&!dischargeEvidenceReviewed){
    setNotice("Periksa bukti tagihan dan centang konfirmasi review sebelum melakukan Approval Discharge.");return;
   }
+  const finalCost=parseAmount(medicalPrice);
+  if(stage==="Treatment"&&finalCost<=0){setNotice("Biaya persetujuan final harus lebih dari Rp 0.");return;}
   const at=Date.now(),doctor=medicalDoctor.trim(),note=medicalNote.trim();
-  setCases(v=>v.map(c=>c.id===caseId?stage==="Treatment"?
-   withHistory({...c,status:"Treatment Approved",treatmentApproval:{doctor,note,approvedAt:at},confirmation:undefined,submittedAt:at},
-    "Treatment Approved","dr. "+doctor+" / PertaLife",note,at):
-   withHistory({...c,status:"Closed",dischargeApproval:{doctor,note,approvedAt:at},confirmation:undefined,submittedAt:at},
-    "Final Discharge Approved","dr. "+doctor+" / PertaLife",note,at):c));
-  setNotice((stage==="Treatment"?"Treatment":"Final discharge")+" disetujui oleh dr. "+doctor+".");
-  setMedicalModal(null);setMedicalDoctor("");setMedicalNote("");setDischargeEvidenceReviewed(false);
+  setCases(v=>v.map(row=>{
+   if(row.id!==caseId)return row;
+   if(stage==="Discharge")return withHistory({...row,status:"Closed",dischargeApproval:{doctor,note,approvedAt:at},confirmation:undefined,submittedAt:at},"Final Discharge Approved","dr. "+doctor+" / PertaLife",note,at);
+   const previous=treatmentVersions(row),last=previous.at(-1);
+   const revised=last?.amount!==finalCost;
+   const versions=revised?[...previous,{version:previous.length+1,amount:finalCost,at,actor:"dr. "+doctor+" / PertaLife",note:"Revisi final: "+note}]:previous;
+   return withHistory({...row,status:"Treatment Approved",treatmentApproval:{doctor,note,approvedAt:at,finalCost},
+    treatmentPricing:{versions,finalAmount:finalCost,finalizedAt:at},
+    confirmation:undefined,submittedAt:at},"Treatment Final Approved","dr. "+doctor+" / PertaLife",
+    "Final "+formatRupiah(finalCost)+" · V"+versions.length+" · "+note,at);
+  }));
+  setNotice(stage==="Treatment"?"Treatment final approved oleh dr. "+doctor+" dengan harga "+formatRupiah(finalCost)+".":"Final discharge disetujui oleh dr. "+doctor+".");
+  setMedicalModal(null);setMedicalDoctor("");setMedicalNote("");setMedicalPrice("");setDischargeEvidenceReviewed(false);
+ }
+ async function exportTreatmentPriceHistory(){
+  const entries=visibleCases.flatMap(c=>treatmentVersions(c).map((v,i)=>{
+   const previous=i?treatmentVersions(c)[i-1].amount:null;
+   return {"Case ID":c.id,"Nomor Kartu":c.memberId,"Nama Peserta":c.name,"Provider":c.provider,"Pelayanan":c.visitType,
+    "Versi":"V"+v.version,"Jenis":v.version===1?"Estimasi Provider":"Revisi PLI/Internal",
+    "Nilai (Rp)":v.amount,"Harga Sebelumnya (Rp)":previous??"",
+    "Selisih (Rp)":previous===null?"":v.amount-previous,"Tanggal Versi":new Date(v.at).toLocaleString("id-ID"),
+    "PIC":v.actor,"Catatan":v.note,"Status Case":c.status,
+    "Nilai Final Disetujui (Rp)":c.treatmentPricing?.finalAmount??c.treatmentApproval?.finalCost??"",
+    "Tanggal Final Approval":c.treatmentPricing?.finalizedAt?new Date(c.treatmentPricing.finalizedAt).toLocaleString("id-ID"):""};
+  }));
+  if(!entries.length){setNotice("Belum ada riwayat harga Treatment untuk diekspor.");return;}
+  try{const XLSX=await import("xlsx");const workbook=XLSX.utils.book_new();const worksheet=XLSX.utils.json_to_sheet(entries);
+   worksheet["!cols"]=[{wch:26},{wch:22},{wch:27},{wch:28},{wch:23},{wch:10},{wch:22},{wch:21},{wch:23},{wch:18},{wch:24},{wch:27},{wch:45},{wch:25},{wch:29},{wch:25}];
+   XLSX.utils.book_append_sheet(workbook,worksheet,"Riwayat Harga");XLSX.writeFile(workbook,"PertaLife_Treatment_Harga_V1-VN.xlsx");
+   setNotice(entries.length+" baris histori harga Treatment berhasil diekspor.");
+  }catch(error){setNotice("Ekspor Excel gagal: "+(error instanceof Error?error.message:"kesalahan tak diketahui"));}
  }
  useEffect(()=>{
   if(!medicalModal)return;
