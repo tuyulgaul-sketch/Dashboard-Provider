@@ -1118,6 +1118,7 @@ export default function Page(){
     </section>
     <section className="providerOverviewBand"><div><strong>Monitoring Pasien · Provider · PertaLife</strong><p>Angka mengikuti akun aktif. Dashboard hanya menampilkan ringkasan, tanpa pengajuan maupun approval.</p></div><span className="countPill">{visibleCases.filter(c=>c.status==="Closed").length} episode selesai</span></section>
    </>}
+   {role==="callcenter"&&(view==="queue"||view==="active-cases"||view==="audit")&&<section className="providerOverviewBand"><div><strong>Histori Negosiasi Biaya Treatment</strong><p>Rekap V1, V2, V3 dan versi berikutnya beserta PIC, waktu, dan nilai final untuk laporan internal.</p></div><button type="button" className="primary" onClick={()=>{void exportTreatmentPriceHistory()}}><FileSpreadsheet size={16}/>Ekspor Excel V1–Vn</button></section>}
    {role==="callcenter"&&(view==="dashboard"||view==="master")&&<section className="card">
     <div className="sectionHead"><div><h2>Simulasi Transaksi Provider</h2><p>Gunakan CARD NO, nama, polis, plan, dan Faskes 1 dari Master Peserta yang sudah di-upload Call Center. Tidak membuat akun peserta baru.</p></div><span className="countPill">{demoCount} transaksi DUMMY</span></div>
     <div className="workflowActions"><span>{members.length} peserta di master browser ini · Contoh workflow FKTP, IGD, rujukan FKRTL, treatment, discharge, klaim, dan pembayaran simulasi.</span><div className="actions"><button type="button" className="primary" disabled={!hydrated||!members.length||demoCount>0} onClick={generateDummyTransactions}><Plus size={16}/>Buat Transaksi Dummy</button>{demoCount>0&&<button type="button" className="dangerBtn" onClick={deleteDummyTransactions}><Trash2 size={15}/>Hapus Dummy ({demoCount})</button>}</div></div>
@@ -1449,9 +1450,21 @@ export default function Page(){
         {hasEvidence&&<label className="medicalBillConfirm"><input type="checkbox" checked={dischargeEvidenceReviewed} onChange={e=>setDischargeEvidenceReviewed(e.target.checked)}/><span>Saya telah memeriksa dokumen pendukung terhadap Final Bill di atas.</span></label>}
        </div>;
       })()}
+      {medicalModal.stage==="Treatment"&&(()=>{
+       const c=cases.find(c=>c.id===medicalModal.caseId);
+       const prices=c?treatmentVersions(c):[];
+       return <div className="medicalBillReview">
+        <div className="medicalBillReviewHead"><div><strong>Riwayat Negosiasi Biaya Treatment</strong><small>Setiap perubahan harga disimpan sebagai versi baru (V1, V2, V3, dst.).</small></div><span className="medicalEvidenceReady">{prices.length} versi</span></div>
+        <div className="tableWrap"><table><thead><tr><th>Versi</th><th>Nilai</th><th>PIC</th><th>Catatan</th></tr></thead><tbody>
+         {prices.map(v=><tr key={v.version}><td><strong>V{v.version}</strong></td><td>{formatRupiah(v.amount)}</td><td>{v.actor}</td><td>{v.note}</td></tr>)}
+        </tbody></table></div>
+        <label>Biaya Estimasi / Persetujuan PLI (Rp) *<div className="moneyInput"><span>Rp</span><input inputMode="numeric" value={medicalPrice} onChange={e=>setMedicalPrice(formatAmountInput(e.target.value))} placeholder="Nominal biaya final atau revisi"/></div></label>
+        <p className="inpatientNote">Simpan revisi harga tanpa mengubah status approval, atau setujui nominal final. Nominal lama tidak ditimpa. Otentikasi dan kewenangan internal untuk approval final masih simulasi.</p>
+       </div>;
+      })()}
       <label>Nama Dokter Pemberi Approval *<input autoFocus value={medicalDoctor} onChange={e=>setMedicalDoctor(e.target.value)} maxLength={150} placeholder="Nama dokter PertaLife" required/></label>
       <label>Catatan Approval / Pertimbangan Medis *<textarea value={medicalNote} onChange={e=>setMedicalNote(e.target.value)} rows={5} maxLength={4000} placeholder="Jelaskan pertimbangan medis dan kondisi penjaminan..." required/></label>
-      <div className="medicalApprovalActions"><button type="button" className="reviewClear" onClick={()=>setMedicalModal(null)}>Batal</button><button type="submit" className="primary" disabled={!medicalDoctor.trim()||!medicalNote.trim()||(medicalModal.stage==="Discharge"&&!!cases.find(c=>c.id===medicalModal.caseId)?.dischargeRequest?.fileIds?.length&&!dischargeEvidenceReviewed)}><CheckCircle2 size={16}/> Konfirmasi Approval</button></div>
+      <div className="medicalApprovalActions"><button type="button" className="reviewClear" onClick={()=>setMedicalModal(null)}>Batal</button>{medicalModal.stage==="Treatment"&&<button type="button" className="reviewClear" disabled={!medicalDoctor.trim()||!medicalNote.trim()||parseAmount(medicalPrice)<=0} onClick={saveTreatmentPriceRevision}>Simpan Revisi Harga</button>}<button type="submit" className="primary" disabled={!medicalDoctor.trim()||!medicalNote.trim()||(medicalModal.stage==="Treatment"&&parseAmount(medicalPrice)<=0)||(medicalModal.stage==="Discharge"&&!!cases.find(c=>c.id===medicalModal.caseId)?.dischargeRequest?.fileIds?.length&&!dischargeEvidenceReviewed)}><CheckCircle2 size={16}/>{medicalModal.stage==="Treatment"?"Final Approval Treatment":"Konfirmasi Approval"}</button></div>
      </form>
     </section>
    </div>,document.body)}
@@ -1480,6 +1493,13 @@ export default function Page(){
     {selectedCase.confirmation&&<><div><span>Need Confirmation</span><b>{selectedCase.confirmation.stage}: {selectedCase.confirmation.reason}</b></div><div><span>Respons Provider</span><b>{selectedCase.confirmation.response||"Belum ada respons"}</b></div></>}
     {selectedCase.billing&&<><div><span>Status Pembayaran</span><b>{selectedCase.billing.status}</b></div><div><span>Reminder</span><b>{selectedCase.billing.reminderCount||0} kali</b></div></>}
    </div>
+   {selectedCase.treatmentRequest&&<section className="caseInpatientHistory">
+    <div className="caseSubhead"><FileSpreadsheet size={18}/><div><b>Histori Harga Treatment — V1 sampai Final</b><span>Seluruh perubahan estimasi dan hasil negosiasi dengan PertaLife tetap tercatat.</span></div></div>
+    <div className="tableWrap"><table><thead><tr><th>Versi</th><th>Tanggal</th><th>PIC</th><th>Biaya (Rp)</th><th>Catatan</th></tr></thead><tbody>
+     {treatmentVersions(selectedCase).map(version=><tr key={version.version}><td><b>V{version.version}</b></td><td>{new Date(version.at).toLocaleString("id-ID")}</td><td>{version.actor}</td><td>{formatRupiah(version.amount)}</td><td>{version.note}</td></tr>)}
+    </tbody></table></div>
+    <p className="inpatientNote">Harga akhir disetujui: <strong>{selectedCase.treatmentPricing?.finalAmount!=null?formatRupiah(selectedCase.treatmentPricing.finalAmount):"Belum ada final approval"}</strong>. Billing pulang tetap dicatat terpisah.</p>
+   </section>}
    {selectedCase.inpatient&&<section className="caseInpatientHistory">
     <div className="caseSubhead"><BedDouble size={18}/><div><b>Rawat Inap — E-Form & Persetujuan</b><span>Peralihan dari case existing; data FKTP / FKRTL / Emergency sebelumnya tetap dipertahankan.</span></div></div>
     <div className="inpatientAuditGrid">
