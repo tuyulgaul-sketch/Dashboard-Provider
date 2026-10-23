@@ -3,7 +3,7 @@ import {useEffect,useMemo,useRef,useState} from "react";
 import {createPortal} from "react-dom";
 import {caseComments,commentReadKey,unreadCaseComments} from "./case-comments";
 import type {CaseComment,CommentKind,ConfirmationStage} from "./case-comments";
-import {downloadCaseFile,fileSizeLabel,saveCaseFiles,validateCaseFiles} from "./case-files";
+import {ADMISSION_FILE_ACCEPT,ADMISSION_FILE_TOTAL_BYTES,downloadCaseFile,fileSizeLabel,saveCaseFiles,validateCaseFiles} from "./case-files";
 import CaseFilePicker from "./CaseFilePicker";
 import {InpatientRequestForm,InpatientBillingForm,InpatientReviewModal} from "./InpatientPanels";
 import {isHospitalEligible,isoToday,dateOffset,isExtensionWindow,totalSubmitted,withComputedExcess} from "./inpatient-model";
@@ -229,6 +229,7 @@ export default function Page(){
  const [pendingAdmissionFiles,setPendingAdmissionFiles]=useState<File[]>([]);
  const [pendingCommentFiles,setPendingCommentFiles]=useState<File[]>([]);
  const [pendingTreatmentFiles,setPendingTreatmentFiles]=useState<File[]>([]);
+ const [pendingInpatientFiles,setPendingInpatientFiles]=useState<File[]>([]);
  const [pendingDischargeFiles,setPendingDischargeFiles]=useState<File[]>([]);
  const [attachmentError,setAttachmentError]=useState("");
  const [uploadBusy,setUploadBusy]=useState(false);
@@ -362,24 +363,26 @@ export default function Page(){
  const modalComments=selectedCase?caseComments(selectedCase):[];
  const caseFileList=selectedCase?.files||[];
  const caseFileBytes=caseFileList.reduce((sum,file)=>sum+file.size,0);
- function addPendingFiles(stage:"admission"|"comment"|"treatment"|"discharge",files:File[]){
+ function addPendingFiles(stage:"admission"|"comment"|"treatment"|"discharge"|"inpatient",files:File[]){
   if(!files.length)return;
-  const current=stage==="admission"?pendingAdmissionFiles:stage==="comment"?pendingCommentFiles:stage==="treatment"?pendingTreatmentFiles:pendingDischargeFiles;
+  const current=stage==="admission"?pendingAdmissionFiles:stage==="comment"?pendingCommentFiles:stage==="treatment"?pendingTreatmentFiles:stage==="inpatient"?pendingInpatientFiles:pendingDischargeFiles;
   const existing=stage==="admission"?[]:selectedCase?.files||[];
   try{
-   validateCaseFiles(existing,current,files);
+   validateCaseFiles(existing,current,files,stage==="admission"?{maxBytes:ADMISSION_FILE_TOTAL_BYTES,admissionTypesOnly:true}:undefined);
    const updated=[...current,...files];
    if(stage==="admission")setPendingAdmissionFiles(updated);
    else if(stage==="comment")setPendingCommentFiles(updated);
    else if(stage==="treatment")setPendingTreatmentFiles(updated);
+   else if(stage==="inpatient")setPendingInpatientFiles(updated);
    else setPendingDischargeFiles(updated);
    setAttachmentError("");
   }catch(error){setAttachmentError(error instanceof Error?error.message:"Lampiran melampaui batas maksimum.");}
  }
- function removePendingFile(stage:"admission"|"comment"|"treatment"|"discharge",index:number){
+ function removePendingFile(stage:"admission"|"comment"|"treatment"|"discharge"|"inpatient",index:number){
   if(stage==="admission")setPendingAdmissionFiles(v=>v.filter((_,i)=>i!==index));
   else if(stage==="comment")setPendingCommentFiles(v=>v.filter((_,i)=>i!==index));
   else if(stage==="treatment")setPendingTreatmentFiles(v=>v.filter((_,i)=>i!==index));
+  else if(stage==="inpatient")setPendingInpatientFiles(v=>v.filter((_,i)=>i!==index));
   else setPendingDischargeFiles(v=>v.filter((_,i)=>i!==index));
   setAttachmentError("");
  }
@@ -521,7 +524,7 @@ export default function Page(){
   const id="MC-"+new Date().toISOString().slice(2,10).replaceAll("-","")+"-"+String(cases.length+1).padStart(4,"0");
   setUploadBusy(true);setAttachmentError("");
   try{
-   validateCaseFiles([],[],pendingAdmissionFiles);
+   validateCaseFiles([],[],pendingAdmissionFiles,{maxBytes:ADMISSION_FILE_TOTAL_BYTES,admissionTypesOnly:true});
    const files=await saveCaseFiles(id,pendingAdmissionFiles,"admission");
    const at=Date.now(),isEmergency=careAccess==="Emergency";
    const admissionLevel=isEmergency&&activeProvider.code==="PRV-HERMINA-KMY-001"?"FKRTL":"FKTP";
@@ -1090,7 +1093,7 @@ export default function Page(){
     <div className="referralEntryNotice"><ShieldCheck size={17}/><span>Approval rujukan adalah izin memulai pelayanan spesialis sesuai rujukan. Tindakan lanjutan tetap mengikuti proses Treatment Request dan batasan benefit.</span></div>
    </div>:<>
     <div className="entryPathInstruction"><span className="entryStepTag">LANGKAH 2 · VERIFIKASI PESERTA</span><div className="accessModeNote"><ShieldCheck size={17}/><span>{careAccess==="Emergency"?(activeProvider.code==="PRV-HERMINA-KMY-001"?"Lakukan asesmen kegawatdaruratan dan stabilisasi segera. Administrasi penjaminan dan verifikasi Call Center tidak boleh menunda penanganan medis.":"Lakukan pertolongan awal sesuai kemampuan klinik; koordinasikan transfer darurat bila diperlukan. Penjaminan tetap diverifikasi PertaLife."):"Cek kepesertaan dan kecocokan Faskes 1. Jika memerlukan spesialis, dokter FKTP membuat rujukan dari episode yang sudah disetujui."}</span></div></div>
-    <div className="eligGrid"><label>Card No<input value={cardNo} onChange={e=>setCardNo(e.target.value)} placeholder="Contoh CARD-DUMMY-000001"/></label><label>{careAccess==="Emergency"?"Jenis Pelayanan":"Pelayanan FKTP"}{careAccess==="Emergency"?<input readOnly value={activeProvider.code==="PRV-HERMINA-KMY-001"?"IGD / Gawat Darurat":"Pertolongan Darurat Awal"}/>:<select value={visitType} onChange={e=>setVisitType(e.target.value)}><option value="Rawat Jalan">Rawat Jalan Dokter Umum</option><option value="Rawat Jalan Gigi">Rawat Jalan Dokter Gigi</option></select>}</label><button className="primary" onClick={lookup}><Search size={17}/>Cek Eligibility</button></div>
+    <div className="eligGrid"><label>Card No<input value={cardNo} onChange={e=>setCardNo(e.target.value)} placeholder="Contoh CARD-DUMMY-000001"/></label><label>{careAccess==="Emergency"?"Jenis Pelayanan":"Pelayanan FKTP"}{careAccess==="Emergency"?<input readOnly value={activeProvider.code==="PRV-HERMINA-KMY-001"?"IGD / Gawat Darurat":"Pertolongan Darurat Awal"}/>:<select value={visitType} onChange={e=>setVisitType(e.target.value)}><option value="Rawat Jalan">Rawat Jalan Dokter Umum</option><option value="Rawat Jalan Gigi">Rawat Jalan Dokter Gigi Umum</option></select>}</label><button className="primary" onClick={lookup}><Search size={17}/>Cek Eligibility</button></div>
    {lookupDone&&!found&&<div className="result bad"><AlertTriangle/><div><b>Peserta tidak ditemukan</b><span>Pastikan CARD NO sudah masuk melalui bulk upload PertaLife.</span></div></div>}
    {found&&<div className="eligResult">
     <div className="resultTop"><div><span className={"statusDot "+(active?"ok":"no")}>{active?"COVERAGE AKTIF":"COVERAGE TIDAK AKTIF"}</span><h3>{found.name}</h3><p>{found.cardNo} · {found.membershipNo}</p></div><div className={"matchBox "+(careAccess==="Emergency"||faskesMatch?"match":"mismatch")}><b>{careAccess==="Emergency"?"Jalur Emergency — Rujukan Awal Tidak Wajib":!faskesMapped?"Faskes 1 Belum Dimapping":faskesMatch?"Faskes 1 Sesuai":"Faskes 1 Tidak Sesuai"}</b><span>{foundFaskesName||"Mapping diperlukan oleh PertaLife"}{foundFaskesCode?" · "+foundFaskesCode:""}</span><small>{careAccess==="Emergency"?"Perlu asesmen medis & verifikasi PertaLife":"Matching berdasarkan FASKES 1 CODE"}</small></div></div>
@@ -1101,7 +1104,7 @@ export default function Page(){
      <div><span>Plan</span><b>{found.planName||"-"} {found.planCode?"("+found.planCode+")":""}</b></div><div><span>Coverage</span><b>{niceDate(found.inception||found.startDate)} - {niceDate(found.expiry||found.endDate)}</b></div><div><span>Card No</span><b>{found.cardNo}</b></div>
     </div>
     {careAccess==="FKTP"&&!faskesMatch&&active&&<div className="override"><label className="check"><input type="checkbox" checked={urgent} onChange={e=>setUrgent(e.target.checked)}/>Ajukan pengecualian Faskes 1 (butuh verifikasi)</label>{urgent&&<><label>Alasan Urgent<select value={urgencyReason} onChange={e=>setUrgencyReason(e.target.value)}><option value="">Pilih alasan</option>{urgencyOptions.map(x=><option key={x}>{x}</option>)}</select></label>{urgencyReason==="Lainnya"&&<label>Penjelasan<input value={urgencyText} onChange={e=>setUrgencyText(e.target.value)} placeholder="Jelaskan alasan urgency"/></label>}</>}</div>}
-    <CaseFilePicker title="Dokumen Pendukung Admission" existing={[]} pending={pendingAdmissionFiles} disabled={uploadBusy} onAdd={files=>addPendingFiles("admission",files)} onRemove={index=>removePendingFile("admission",index)}/>
+    <CaseFilePicker title="Dokumen Pendukung Admission" maxTotalMB={20} accept={ADMISSION_FILE_ACCEPT} existing={[]} pending={pendingAdmissionFiles} disabled={uploadBusy} onAdd={files=>addPendingFiles("admission",files)} onRemove={index=>removePendingFile("admission",index)}/>
     {attachmentError&&<div className="caseUploadError" role="alert">{attachmentError}</div>}
     <div className="admissionBox"><label>{careAccess==="Emergency"?"Hasil Triase / Asesmen Darurat *":"Keluhan / Indikasi *"}<textarea value={complaint} onChange={e=>setComplaint(e.target.value)} placeholder={careAccess==="Emergency"?"Jelaskan kondisi darurat, hasil triase, tanda vital bila ada, dan penanganan awal...":"Jelaskan keluhan utama peserta"}/></label><button className="primary" disabled={!canSubmit||uploadBusy} onClick={()=>requestConfirmation("Konfirmasi Admission","Pastikan kepesertaan, Faskes 1, dan keluhan pasien sudah benar. Pengajuan akan menunggu verifikasi Call Center PertaLife.",()=>{void submitAdmission();})}>{careAccess==="Emergency"?"Submit Admission Darurat":"Submit Admission FKTP"} <ArrowRight size={17}/></button>{!active&&<small>Coverage peserta sedang tidak aktif berdasarkan periode INCEPTION/EXPIRY atau START/END DATE.</small>}{careAccess==="Emergency"&&<small>Jalur emergency mengikuti asesmen kegawatdaruratan. Admission tetap diverifikasi Call Center; penanganan pasien tidak ditunda.</small>}{careAccess==="FKTP"&&active&&!faskesMatch&&!urgent&&<small>{faskesMapped?"Submit terkunci karena Faskes 1 tidak sesuai.":"Submit normal terkunci karena Faskes 1 belum dimapping."} Aktifkan permintaan pengecualian jika diperlukan; Call Center tetap harus memverifikasi.</small>}</div>
    </div>}
@@ -1223,10 +1226,10 @@ export default function Page(){
     <label>Produk<input value={claimDraft.product} onChange={e=>setClaimDraft({...claimDraft,product:e.target.value})}/></label>
     <label>Jenis Klaim (mengikuti Admission)<input value={claimTypeSummary(cases.filter(c=>claimDraft.bundleCaseIds?.includes(c.id)))} readOnly title="Jenis pelayanan mengikuti Admission setiap case"/></label>
     <label>Jenis Reimbursement<input value={claimDraft.reimbursementType} onChange={e=>setClaimDraft({...claimDraft,reimbursementType:e.target.value})} placeholder="Opsional"/></label>
-    <label>Nama Bank *<input value={claimDraft.bankName} onChange={e=>setClaimDraft({...claimDraft,bankName:e.target.value})} placeholder="Contoh Bank Mandiri"/></label>
+    <label>Nama Bank *<input value={claimDraft.bankName} readOnly title="Diambil dari Profile Provider" placeholder="Lengkapi melalui Profile Provider"/></label>
     <label>Metode Pembayaran<input value="Transfer" readOnly aria-label="Metode pembayaran Transfer"/></label>
-    <label>No. Rekening *<input value={claimDraft.accountNo} onChange={e=>setClaimDraft({...claimDraft,accountNo:e.target.value.replace(/\D/g,"")})} inputMode="numeric"/></label>
-    <label>Atas Nama *<input value={claimDraft.accountName} onChange={e=>setClaimDraft({...claimDraft,accountName:e.target.value})}/></label>
+    <label>No. Rekening *<input value={claimDraft.accountNo} readOnly title="Diambil dari Profile Provider yang sudah diverifikasi" placeholder="Lengkapi melalui Profile Provider"/></label>
+    <label>Atas Nama *<input value={claimDraft.accountName} readOnly title="Diambil dari Profile Provider" placeholder="Lengkapi melalui Profile Provider"/></label>
     <label>Nama Pemohon<input value={claimDraft.applicantName} onChange={e=>setClaimDraft({...claimDraft,applicantName:e.target.value})}/></label>
     <label>Nama Peserta<input value={claimDraft.participantName} readOnly/></label>
     <label>No. Peserta<input value={claimDraft.participantNo} readOnly/></label>
