@@ -20,7 +20,7 @@ export function validateCaseFiles(existing:readonly CaseFileMeta[],pending:reado
  const count=existing.length+pending.length+next.length;
  const bytes=existing.reduce((sum,f)=>sum+f.size,0)+
    [...pending,...next].reduce((sum,f)=>sum+f.size,0);
- if(count>CASE_FILE_LIMIT)throw Error("Maksimal "+CASE_FILE_LIMIT+" dokumen per case. Sudah ada "+existing.length+" dokumen tersimpan dan "+pending.length+" dokumen dipilih.");
+ if(count>CASE_FILE_LIMIT)throw Error("Maksimal "+CASE_FILE_LIMIT+" dokumen per proses. Sudah ada "+existing.length+" dokumen tersimpan dan "+pending.length+" dokumen dipilih.");
  const maxBytes=options?.maxBytes??CASE_FILE_TOTAL_BYTES;
  if(bytes>maxBytes)throw Error("Total dokumen maksimal "+(maxBytes/(1024*1024))+" MB. Total pilihan "+fileSizeLabel(bytes)+".");
  if(options?.admissionTypesOnly&&next.some(file=>!(/\.(pdf|jpe?g|png)$/i.test(file.name)&&["application/pdf","image/jpeg","image/png",""].includes(file.type))))
