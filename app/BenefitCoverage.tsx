@@ -100,15 +100,17 @@ export default function BenefitCoverage({member,memberActive,variant="provider",
     {!isProvider&&<label className="benefitSelect"><span>Kategori</span><select aria-label="Filter kategori benefit" value={category} onChange={e=>setCategory(e.target.value)}><option value="all">Semua kategori</option>{PILOT_CATEGORIES.map(name=><option key={name} value={name}>{name}</option>)}</select></label>}
     <button type="button" className="benefitReset" onClick={reset}>Reset Filter</button>
    </div>
-   <div className="benefitTableWrap"><table className="benefitTable"><thead><tr><th>No.</th><th>Item Manfaat</th><th>Batasan / Ketentuan</th><th>Manfaat</th><th>Dibayar</th><th>Sisa Nominal</th></tr></thead><tbody>
+   <div className="benefitTableWrap"><table className="benefitTable"><thead><tr><th>No.</th><th>Item Manfaat</th><th>Batasan / Ketentuan</th>{!isProvider&&<><th>Manfaat</th><th>Dibayar</th><th>Sisa Nominal</th></>}</tr></thead><tbody>
     {shown.length?shown.map(item=><tr key={item.id}>
      <td>{item.id}</td>
      <td><strong>{item.name}</strong>{!isProvider&&<small>{item.category}</small>}{item.scope==="per-polis"&&<span className="benefitScope">PER POLIS</span>}</td>
      <td>{item.restriction||<span className="benefitMuted">Tidak dicantumkan pada sampel</span>}</td>
+{!isProvider&&<>
      <td>{item.kind==="as-charged"?<span className="benefitAsCharged">As Charged</span>:<strong>{toRupiah(item.limit)}</strong>}</td>
      <td>{toRupiah(item.paid)}</td>
      <td>{item.kind==="as-charged"?<span className="benefitMuted">Tidak dihitung</span>:item.limit-item.paid<=0?<span className="benefitExhausted">Rp0 · Habis*</span>:<strong className="benefitRemaining">{toRupiah(item.limit-item.paid)}</strong>}</td>
-    </tr>):<tr><td colSpan={6} className="benefitEmpty">Tidak ada item benefit pada pilihan ini. Coba kelompok lain atau ubah pencarian.</td></tr>}
+     </>}
+    </tr>):<tr><td colSpan={isProvider?3:6} className="benefitEmpty">Tidak ada item benefit pada pilihan ini. Coba kelompok lain atau ubah pencarian.</td></tr>}
    </tbody></table></div>
    <div className="benefitFoot"><ShieldCheck size={17}/><div><strong>{shown.length} dari {allowed.length} item benefit {isProvider?"pelayanan medis":"lengkap"}</strong><span>{PILOT_DISCLAIMER} {isProvider?"Petugas Provider tetap mengikuti proses persetujuan Call Center.": "Call Center memeriksa eligibility dan kebutuhan medis sebelum approval."} *“Habis” hanya menunjukkan sisa nominal contoh, bukan keputusan akhir coverage.</span></div></div>
   </>}
