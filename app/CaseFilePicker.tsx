@@ -13,7 +13,7 @@ export default function CaseFilePicker({title="Lampirkan Dokumen",existing,pendi
  const maxBytes=maxTotalMB*1024*1024;
  const full=count>=CASE_FILE_LIMIT||used>=maxBytes;
  return <div className="caseFilePicker">
-  <div className="caseFilePickerHead"><div><strong>{title}</strong><span>{accept?"PDF, JPG, JPEG, PNG":"Semua tipe file"} · Maksimal 10 dokumen per case · Total gabungan {maxTotalMB} MB. {required?"Minimal 1 bukti tagihan wajib.":"Opsional."}</span></div><span className="caseFileQuota">{count}/{CASE_FILE_LIMIT} file · {fileSizeLabel(used)}/{maxTotalMB} MB</span></div>
+  <div className="caseFilePickerHead"><div><strong>{title}</strong><span>{accept?"PDF, JPG, JPEG, PNG":"Semua tipe file"} · Maksimal 10 dokumen per proses · Total gabungan {maxTotalMB} MB. {required?"Minimal 1 bukti tagihan wajib.":"Opsional."}</span></div><span className="caseFileQuota">{count}/{CASE_FILE_LIMIT} file · {fileSizeLabel(used)}/{maxTotalMB} MB</span></div>
   <label className={"caseFileChoose "+(full||disabled?"disabled":"")}>
    <FilePlus2 size={17}/> {full?"Batas dokumen tercapai":"Pilih Dokumen"} 
    <input type="file" multiple accept={accept} disabled={disabled||full} aria-label={"Unggah dokumen pendukung, maksimal 10 file dan "+maxTotalMB+" MB gabungan"} onChange={event=>{onAdd(Array.from(event.currentTarget.files||[]));event.currentTarget.value="";}}/>
