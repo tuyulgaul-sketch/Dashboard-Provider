@@ -15,11 +15,10 @@ const Field=({label,value,onChange,required=false,placeholder="",type="text"}:{l
  <label className="inpatientField">{label}{required&&<em> *</em>}<input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} required={required}/></label>;
 const Multiline=({label,value,onChange,required=false}:{label:string;value:string;onChange:(v:string)=>void;required?:boolean})=>
  <label className="inpatientField full">{label}{required&&<em> *</em>}<textarea rows={2} value={value} onChange={e=>onChange(e.target.value)} required={required}/></label>;
-export function InpatientRequestForm({patient,onSubmit,onCancel}:{patient:Patient;onSubmit:(form:InpatientForm)=>void;onCancel:()=>void}){
+export function InpatientRequestForm({patient,onSubmit,onCancel,uploadSlot}:{patient:Patient;onSubmit:(form:InpatientForm)=>void;onCancel:()=>void;uploadSlot?:React.ReactNode}){
  const [form,setForm]=useState<InpatientForm>(blankInpatientForm);
  const [error,setError]=useState("");
  const update=<K extends keyof InpatientForm>(key:K,value:InpatientForm[K])=>setForm(s=>({...s,[key]:value}));
- const money=(raw:string)=>Math.max(0,Number(raw.replace(/\D/g,""))||0);
  const submit=(e:React.FormEvent)=>{e.preventDefault();const validation=validateInpatientRequest(form);if(validation){setError(validation);return;}onSubmit(form)};
  return <section className="card inpatientCard">
   <div className="sectionHead"><div><h2>Surat Permintaan Jaminan Rawat Inap</h2><p>E-form berdasarkan Formulir Prokes. Identitas peserta diisi otomatis dari case.</p></div><button className="reviewClear" type="button" onClick={onCancel}><X size={16}/> Batal</button></div>
@@ -34,12 +33,12 @@ export function InpatientRequestForm({patient,onSubmit,onCancel}:{patient:Patien
     <div><span>Managed Health Care Plan</span><strong>{patient.planName||"-"}</strong></div>
    </div>
    <div className="inpatientFields">
-    <Field label="Tanggal Masuk" type="date" required value={form.admissionDate} onChange={v=>update("admissionDate",v)}/>
+    <label className="inpatientField">Tanggal Admission (Realtime) *<input type="date" value={form.admissionDate} readOnly aria-readonly="true"/><small>Diisi otomatis dan dikunci. Koreksi tanggal hanya melalui otorisasi Call Center.</small></label>
     <Field label="Diagnosis Masuk" required value={form.admissionDiagnosis} onChange={v=>update("admissionDiagnosis",v)}/>
-    <Field label="Kelas Kamar" required value={form.roomClass} onChange={v=>update("roomClass",v)}/>
-    <label className="inpatientField">Tarif Kamar per Hari (Rp) *<input inputMode="numeric" value={form.roomRate||""} onChange={e=>update("roomRate",money(e.target.value))} required/></label>
-    <Field label="Jenis Plan (Supra/Utama/Madya/Standar)" value={form.managedCarePlan} onChange={v=>update("managedCarePlan",v)}/>
-    <label className="inpatientField">Hak Kamar Peserta (Rp)<input inputMode="numeric" value={form.roomEntitlement||""} onChange={e=>update("roomEntitlement",money(e.target.value))}/></label>
+    <label className="inpatientField">Jenis Plan *<select value={form.managedCarePlan} required onChange={e=>update("managedCarePlan",e.target.value)}>
+      <option value="">Pilih Jenis Plan</option>
+      <option value="Supra">Supra</option><option value="Utama">Utama</option><option value="Madya">Madya</option><option value="Standar">Standar</option>
+     </select><small>Supra = VIP · Utama = Kelas I · Madya = Kelas II · Standar = Kelas III</small></label>
    </div>
    <h3>2. Indikasi Medis & Pemeriksaan</h3>
    <div className="inpatientFields">
@@ -73,6 +72,7 @@ export function InpatientRequestForm({patient,onSubmit,onCancel}:{patient:Patien
     <Field label="Tempat dan Tanggal" value={form.declaredAt} onChange={v=>update("declaredAt",v)}/>
    </div>
    <p className="inpatientNote">Pernyataan dokter: seluruh informasi di atas benar menurut pengetahuan dan keyakinan pengisi. Prototype e-form ini belum menjadi tanda tangan digital dokter atau stempel RS.</p>
+   {uploadSlot}
    {error&&<div className="caseUploadError" role="alert">{error}</div>}
    <div className="inpatientActions"><button className="primary" type="submit"><BedDouble size={17}/> Kirim Permintaan Rawat Inap</button></div>
   </form>
