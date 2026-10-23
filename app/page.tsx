@@ -645,19 +645,27 @@ export default function Page(){
  function startInpatient(id:string){
   const c=cases.find(c=>c.id===id);
   if(!c||!canStartInpatient(c))return;
-  setSelectedCaseId(id);setActionModal("inpatient-form");setShowCaseDetail(false);setNotice("");
+  setSelectedCaseId(id);setActionModal("inpatient-form");setPendingInpatientFiles([]);setAttachmentError("");setShowCaseDetail(false);setNotice("");
  }
- function submitInpatientRequest(request:InpatientForm){
+ async function submitInpatientRequest(request:InpatientForm){
   const c=selectedCase;
-  if(!c||!canStartInpatient(c))return;
-  const at=Date.now();
-  const episode:InpatientEpisode={state:"Waiting Approval",request,requestedAt:at,extensions:[]};
-  setCases(v=>v.map(x=>x.id===c.id?withHistory({
-   ...x,inpatient:episode,status:"Waiting Inpatient Approval",submittedAt:at
-  },"Inpatient Admission Requested",c.provider,
-   "Diagnosa: "+request.diagnosis+" · Estimasi "+request.estimatedDays+" hari · "+request.admissionDate,at):x));
-  setActionModal(null);setWorklistTab("process");setSelectedCaseId(null);
-  setNotice("Formulir Prokes Rawat Inap terkirim. Tunggu verifikasi jumlah hari dan approval dokter Call Center.");
+  if(!c||!canStartInpatient(c)||uploadBusy)return;
+  setUploadBusy(true);setAttachmentError("");
+  try{
+   validateCaseFiles(c.files||[],[],pendingInpatientFiles);
+   const files=await saveCaseFiles(c.id,pendingInpatientFiles,"inpatient");
+   const at=Date.now();
+   const episode:InpatientEpisode={state:"Waiting Approval",request,requestedAt:at,extensions:[]};
+   setCases(v=>v.map(x=>x.id===c.id?withHistory({
+    ...x,inpatient:episode,status:"Waiting Inpatient Approval",submittedAt:at,
+    files:[...(x.files||[]),...files]
+   },"Inpatient Admission Requested",c.provider,
+    "Diagnosa: "+request.diagnosis+" · Estimasi "+request.estimatedDays+" hari · "+request.admissionDate+
+    (files.length?" · "+files.length+" dokumen":"") ,at):x));
+   setPendingInpatientFiles([]);setActionModal(null);setWorklistTab("process");setSelectedCaseId(null);
+   setNotice("Permintaan rawat inap terkirim beserta "+files.length+" lampiran. Menunggu verifikasi Call Center.");
+  }catch(error){setAttachmentError(error instanceof Error?error.message:"Lampiran rawat inap gagal disimpan.");}
+  finally{setUploadBusy(false);}
  }
  function openInpatientExtension(c:CareCase){
   if(role!=="provider"||!c.inpatient||c.inpatient.state!=="Active")return;
@@ -1127,7 +1135,8 @@ export default function Page(){
 
   {role==="provider"&&actionModal==="inpatient-form"&&selectedCase&&inpatientHospital(selectedCase)&&!selectedCase.inpatient&&
    <WorkflowModal title="Ajukan Rawat Inap" description={selectedCase.id+" · "+selectedCase.name+" · Menunggu persetujuan Call Center"} onClose={closeActionModal}><InpatientRequestForm key={selectedCase.id} patient={inpatientPatient(selectedCase)}
-    onSubmit={form=>requestConfirmation("Konfirmasi Rawat Inap","Periksa diagnosis, indikasi medis, kelas kamar, lama rawat, dan pengesahan dokter. Pengajuan akan menunggu approval Call Center.",()=>submitInpatientRequest(form))} onCancel={closeActionModal}/></WorkflowModal>}
+    onSubmit={form=>requestConfirmation("Konfirmasi Rawat Inap","Periksa diagnosis, indikasi medis, jenis plan, lama rawat, dan pengesahan dokter. Pengajuan akan menunggu approval Call Center.",()=>{void submitInpatientRequest(form);})} onCancel={closeActionModal}
+     uploadSlot={<div className="treatmentUploadCard"><CaseFilePicker title="Dokumen Pendukung Rawat Inap" existing={selectedCase.files||[]} pending={pendingInpatientFiles} disabled={uploadBusy} onAdd={files=>addPendingFiles("inpatient",files)} onRemove={i=>removePendingFile("inpatient",i)}/>{attachmentError&&<div className="caseUploadError" role="alert">{attachmentError}</div>}</div>}/></WorkflowModal>}
 
   {role==="provider"&&actionModal==="inpatient-billing"&&selectedCase?.inpatient?.state==="Active"&&
    <WorkflowModal title="Ajukan Discharge Rawat Inap" description={selectedCase.id+" · "+selectedCase.name+" · Review perhitungan pulang"} onClose={closeActionModal} busy={uploadBusy}><InpatientBillingForm key={selectedCase.id} patient={inpatientPatient(selectedCase)} episode={selectedCase.inpatient}
