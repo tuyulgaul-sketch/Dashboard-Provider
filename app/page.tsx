@@ -603,6 +603,55 @@ export default function Page(){
   });
   setNotice(outcome==="Approved"?"Rujukan Approved. Admission FKRTL Hermina otomatis dibuat tanpa approval Admission kedua. Treatment tetap perlu persetujuan tersendiri.":"Rujukan "+outcome+". Provider dapat melihat catatan verifikasi.");
  }
+ function referralUseCount(referralId:string){
+  return cases.filter(c=>c.careLevel==="FKRTL"&&c.originReferralId===referralId).length;
+ }
+ function referralStatusForCase(c:CareCase){
+  const parent=cases.find(x=>x.id===c.parentCaseId);
+  const referral=parent?.referral;
+  const used=referral?referralUseCount(referral.id):0;
+  const eligibility=referralEligibility(referral,used,now);
+  const currentOpen=cases.some(x=>x.originReferralId===c.originReferralId&&x.status!=="Closed");
+  const member=members.find(m=>m.cardNo.toLowerCase()===c.memberId.toLowerCase());
+  const doctorMismatch=!!c.specialistDoctor&&!!referral?.specialistDoctor&&c.specialistDoctor.trim().toLowerCase()!==referral.specialistDoctor.trim().toLowerCase();
+  return {...eligibility,used,referral,allowed:eligibility.valid&&!currentOpen&&!doctorMismatch&&!!member&&isActiveMember(member),reason:doctorMismatch?"Dokter tujuan pada admission tidak sama dengan rujukan.":currentOpen?"Selesaikan episode FKRTL aktif sebelumnya.":!member||!isActiveMember(member)?"Kepesertaan tidak aktif.":eligibility.reason};
+ }
+ function addNextFKRTLVisit(previousId:string){
+  if(role!=="provider")return;
+  const previous=cases.find(c=>c.id===previousId);
+  if(!previous||previous.providerCode!==activeProvider.code||!previous.originReferralId)return;
+  const state=referralStatusForCase(previous);
+  if(!state.allowed){setNotice("Kunjungan ulang belum eligible: "+state.reason);return;}
+  const origin=cases.find(c=>c.id===previous.parentCaseId);
+  if(!origin||!state.referral)return;
+  const at=Date.now(),number=state.used+1,referral=state.referral;
+  const newId="MC-FKRTL-"+at.toString(36).toUpperCase()+"-"+(cases.length+1);
+  const next:CareCase={
+   id:newId,name:previous.name,memberId:previous.memberId,company:previous.company,
+   provider:previous.provider,providerCode:previous.providerCode,
+   status:"Treatment Active",urgent:false,submittedAt:at,
+   issue:"Kunjungan ulang rujukan "+referral.refNumber+" ("+number+"/"+REFERRAL_MAX_VISITS+")",
+   visitType:"Rawat Jalan Spesialis",careLevel:"FKRTL",accessRoute:"Referral",
+   parentCaseId:origin.id,originReferralId:referral.id,specialty:referral.specialty,specialistDoctor:referral.specialistDoctor,
+   policyNo:origin.policyNo,planName:origin.planName,
+   history:[{at,actor:activeProvider.name,event:"Automatic FKRTL Admission / Referral Reuse",
+    detail:"Rujukan "+referral.refNumber+" · pemakaian "+number+"/"+REFERRAL_MAX_VISITS+" · dokter tujuan "+referral.specialistDoctor}]
+  };
+  setCases(current=>{
+   const check=referralEligibility(referral,current.filter(c=>c.originReferralId===referral.id).length,at);
+   if(!check.valid||current.some(c=>c.originReferralId===referral.id&&c.status!=="Closed"))return current;
+   return [next,...current.map(c=>c.id===origin.id?withHistory(c,"Referral Visit "+number+" Auto-Admission",activeProvider.name,newId+" · "+referral.refNumber,at):c)];
+  });
+  setNotice("Admission FKRTL kunjungan "+number+"/"+REFERRAL_MAX_VISITS+" dibuat otomatis. Rujukan tetap terhubung dan riwayat tidak tertimpa.");
+  setReferralSearch("");setWorklistTab("action");
+ }
+ function updateFKRTLService(id:string,service:"Rawat Jalan Spesialis"|"Laboratorium"){
+  const c=cases.find(x=>x.id===id);
+  if(role!=="provider"||!c||c.providerCode!==activeProvider.code||c.careLevel!=="FKRTL"||c.status!=="Treatment Active")return;
+  const at=Date.now();
+  setCases(current=>current.map(item=>item.id===id?withHistory({...item,visitType:service},"FKRTL Service Selected",activeProvider.name,service,at):item));
+  setNotice("Jenis pelayanan FKRTL diperbarui menjadi "+service+".");
+ }
  function openCaseDetail(id:string){
   const focused=document.activeElement;
   caseDetailReturnFocusRef.current=focused instanceof HTMLElement?focused:null;
