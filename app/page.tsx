@@ -1145,7 +1145,7 @@ export default function Page(){
     disabled={uploadBusy} onSubmit={bill=>requestConfirmation("Konfirmasi Discharge Rawat Inap","Pastikan final diagnosis, rincian biaya dan lampiran bukti tagihan benar sebelum dikirim ke PertaLife.",()=>{void submitInpatientBilling(bill);})} onCancel={closeActionModal}
     uploadSlot={<div className="inpatientRequiredReceipt">
      <h3>5. Bukti Tagihan Rawat Inap (Wajib)</h3>
-     <p>Lampirkan kwitansi, rincian biaya, atau bukti tagihan pendukung. Mengikuti kuota lampiran case existing: maksimum 10 file dengan total 10 MB.</p>
+     <p>Lampirkan kwitansi, rincian biaya, atau bukti tagihan pendukung. Maksimum 10 file dengan total 10 MB untuk dokumen Discharge ini.</p>
      <CaseFilePicker required title="Bukti Billing Pasien Pulang" existing={(selectedCase.files||[]).filter(f=>f.origin==="discharge")} pending={pendingDischargeFiles}
       disabled={uploadBusy} onAdd={files=>addPendingFiles("discharge",files)} onRemove={index=>removePendingFile("discharge",index)}/>
      {attachmentError&&<div className="caseUploadError" role="alert">{attachmentError}</div>}
@@ -1176,7 +1176,7 @@ export default function Page(){
     <div className="dischargeBillHead"><FileCheck2 size={20}/><div><strong>Bukti Tagihan Final Bill <span className="dischargeRequiredTag">WAJIB</span></strong><p>Unggah kwitansi, invoice, rincian biaya, atau bukti tagihan lainnya yang mendasari nominal Final Bill. Dokumen akan diperiksa Call Center sebelum approval.</p></div></div>
     <div className="dischargeBillAmount"><span>Nilai yang dimintakan persetujuan</span><strong>{formatRupiah(parseAmount(finalBill))}</strong></div>
     <CaseFilePicker required title="Unggah Kwitansi / Invoice / Rincian Biaya" existing={(selectedCase.files||[]).filter(f=>f.origin==="discharge")} pending={pendingDischargeFiles} disabled={uploadBusy} onAdd={files=>addPendingFiles("discharge",files)} onRemove={index=>removePendingFile("discharge",index)}/>
-    {!pendingDischargeFiles.length&&<small className="dischargeBillHint">Tambahkan minimal 1 file sebagai dasar tagihan. Total seluruh lampiran case tetap maksimal 10 file / 10 MB.</small>}
+    {!pendingDischargeFiles.length&&<small className="dischargeBillHint">Tambahkan minimal 1 file sebagai dasar tagihan. Lampiran Discharge maksimal 10 file / 10 MB.</small>}
     {attachmentError&&<div className="caseUploadError" role="alert">{attachmentError}</div>}
    </div>
    <div className="workflowActions"><span>Discharge beserta bukti tagihan akan diverifikasi Call Center sebelum Final Discharge Approved.</span><button className="primary" disabled={uploadBusy||!finalDiagnosis.trim()||!finalBill.trim()||parseAmount(finalBill)<=0||!pendingDischargeFiles.length} onClick={()=>requestConfirmation("Konfirmasi Discharge","Final bill, diagnosis, dan lampiran akan dikirim untuk persetujuan Call Center PertaLife.",()=>{void submitDischarge();})}>{uploadBusy?"Menyimpan Bukti Tagihan...":"Submit Discharge"} <ArrowRight size={17}/></button></div>
@@ -1239,7 +1239,7 @@ export default function Page(){
     <label>Jenis Reimbursement<input value={claimDraft.reimbursementType} onChange={e=>setClaimDraft({...claimDraft,reimbursementType:e.target.value})} placeholder="Opsional"/></label>
     <label>Nama Bank *<input value={claimDraft.bankName} readOnly title="Diambil dari Profile Provider" placeholder="Lengkapi melalui Profile Provider"/></label>
     <label>Metode Pembayaran<input value="Transfer" readOnly aria-label="Metode pembayaran Transfer"/></label>
-    <label>No. Rekening *<input value={claimDraft.accountNo} readOnly title="Diambil dari Profile Provider yang sudah diverifikasi" placeholder="Lengkapi melalui Profile Provider"/></label>
+    <label>No. Rekening *<input value={claimDraft.accountNo} readOnly title="Diambil dari Profile Provider (simulasi; verifikasi rekening oleh PertaLife belum terintegrasi)" placeholder="Lengkapi melalui Profile Provider"/></label>
     <label>Atas Nama *<input value={claimDraft.accountName} readOnly title="Diambil dari Profile Provider" placeholder="Lengkapi melalui Profile Provider"/></label>
     <label>Nama Pemohon<input value={claimDraft.applicantName} onChange={e=>setClaimDraft({...claimDraft,applicantName:e.target.value})}/></label>
     <label>Nama Peserta<input value={claimDraft.participantName} readOnly/></label>
