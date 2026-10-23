@@ -4,7 +4,7 @@ import {ArrowRight,CheckCircle2,ClipboardCheck,FileText,Search,ShieldCheck,Steth
 import WorkflowModal from "./WorkflowModal";
 
 export type ReferralStatus="Pending Verification"|"Need Revision"|"Approved"|"Rejected";
-export type ReferralDraft={refNumber:string;specialty:string;doctor:string;diagnosis:string;reason:string;documentReference:string};
+export type ReferralDraft={refNumber:string;specialty:string;doctor:string;specialistDoctor:string;diagnosis:string;reason:string;documentReference:string};
 export type ReferralRequest=ReferralDraft&{id:string;kind:"Internal (Satu Atap)"|"Eksternal";sourceCaseId:string;sourceProviderCode:string;targetProviderCode:string;targetProviderName:string;status:ReferralStatus;submittedAt:number;reviewedAt?:number;reviewer?:string;reviewNote?:string;linkedCaseId?:string};
 export type ReferralRow={id:string;name:string;memberId:string;provider:string;providerCode?:string;status:string;careLevel?:string;accessRoute?:string;referral?:ReferralRequest;issue:string;parentCaseId?:string};
 const HERM="PRV-HERMINA-KMY-001";
@@ -21,17 +21,18 @@ export function ProviderReferrals({cases,eligibleIds,selectedId,modalOnly=false,
   tab==="action"?eligibleIds.includes(c.id):tab==="process"?!!c.referral&&["Pending Verification","Need Revision"].includes(c.referral.status):!!c.referral&&["Approved","Rejected"].includes(c.referral.status));
  const [specialty,setSpecialty]=useState("");
  const [doctor,setDoctor]=useState("");
+ const [specialistDoctor,setSpecialistDoctor]=useState("");
  const [diagnosis,setDiagnosis]=useState("");
  const [reason,setReason]=useState("");
  const [documentReference,setDocumentReference]=useState("");
  useEffect(()=>{
   const prev=selected?.referral;
-  setSpecialty(prev?.specialty||"");setDoctor(prev?.doctor||"");
+  setSpecialty(prev?.specialty||"");setDoctor(prev?.doctor||"");setSpecialistDoctor(prev?.specialistDoctor||"");
   setDiagnosis(prev?.diagnosis||"");setReason(prev?.reason||"");setDocumentReference(prev?.documentReference||"");
  },[selected?.id,selected?.referral?.submittedAt]);
  const available=selected&&eligibleIds.includes(selected.id);
  const target=selected?.providerCode===HERM?"Internal (Satu Atap)":"Eksternal";
- const valid=!!specialty.trim()&&!!doctor.trim()&&!!diagnosis.trim()&&!!reason.trim();
+ const valid=!!specialty.trim()&&!!doctor.trim()&&!!specialistDoctor.trim()&&!!diagnosis.trim()&&!!reason.trim();
  return <>{!modalOnly&&<section className="card referralPanel">
   <div className="sectionHead"><div><h2>Pengajuan Rujukan FKTP → FKRTL</h2><p>FKTP Kimia Farma dapat merujuk ke Hermina; FKTP Hermina dapat melakukan rujukan internal satu atap. Semua rujukan harus disetujui Call Center sebelum pelayanan spesialis.</p></div><span className="countPill">{cases.filter(c=>c.referral).length} rujukan</span></div>
   <div className="referralSteps"><span>1 · Admission FKTP disetujui</span><ArrowRight size={15}/><span>2 · Pengajuan Rujukan</span><ArrowRight size={15}/><span>3 · Verifikasi Call Center</span><ArrowRight size={15}/><span>4 · Admission FKRTL otomatis</span></div>
@@ -56,12 +57,13 @@ export function ProviderReferrals({cases,eligibleIds,selectedId,modalOnly=false,
     <label>Faskes Tujuan<input readOnly value="RS Hermina Kemayoran — FKRTL"/></label>
     <label>Poli / Spesialis Tujuan *<select value={specialty} onChange={e=>setSpecialty(e.target.value)}><option value="">Pilih spesialis</option>{specialties.map(x=><option key={x}>{x}</option>)}</select></label>
     <label>Dokter FKTP Perujuk *<input value={doctor} onChange={e=>setDoctor(e.target.value)} placeholder="Nama dokter FKTP"/></label>
+    <label>Dokter Spesialis Tujuan *<input value={specialistDoctor} onChange={e=>setSpecialistDoctor(e.target.value)} placeholder="Dokter tujuan untuk validasi pemakaian 3 kali"/></label>
     <label>Referensi Dokumen Medis (Opsional)<input value={documentReference} onChange={e=>setDocumentReference(e.target.value)} placeholder="Nomor berkas / catatan lokasi dokumen"/></label>
     <label className="full">Diagnosis Awal *<textarea value={diagnosis} onChange={e=>setDiagnosis(e.target.value)} placeholder="Diagnosis atau dugaan diagnosis dari pemeriksaan FKTP"/></label>
     <label className="full">Indikasi / Alasan Rujukan *<textarea value={reason} onChange={e=>setReason(e.target.value)} placeholder="Mengapa membutuhkan pemeriksaan spesialis"/></label>
    </div>
-   <div className="referralWarning">Prototype ini menyimpan nomor/referensi dokumen, bukan file medis sebenarnya. Pelayanan spesialis menunggu keputusan Approved dari Call Center PertaLife.</div>
-   <div className="workflowActions"><span>Persetujuan rujukan otomatis membuat episode FKRTL tanpa approval Admission kedua.</span><button type="button" className="primary" disabled={!valid} onClick={()=>{onSubmit(selected.id,{refNumber:"",specialty,doctor:doctor.trim(),diagnosis:diagnosis.trim(),reason:reason.trim(),documentReference:documentReference.trim()})}}><FileText size={17}/>Submit Rujukan</button></div>
+   <div className="referralWarning">Nomor rujukan berlaku 3 bulan kalender sejak approval dan maksimal 3 admission FKRTL tervalidasi dengan dokter spesialis tujuan yang sama. Prototype ini belum mengirim dokumen ke aplikasi nasabah.</div>
+   <div className="workflowActions"><span>Persetujuan rujukan otomatis membuat episode FKRTL tanpa approval Admission kedua.</span><button type="button" className="primary" disabled={!valid} onClick={()=>{onSubmit(selected.id,{refNumber:"",specialty,doctor:doctor.trim(),specialistDoctor:specialistDoctor.trim(),diagnosis:diagnosis.trim(),reason:reason.trim(),documentReference:documentReference.trim()})}}><FileText size={17}/>Submit Rujukan</button></div>
    </>}
   </div></WorkflowModal>}
  </>;
@@ -89,6 +91,7 @@ export function CallCenterReferrals({cases,onReview,onDetail,onViewBenefit,getUn
     <div><span>Poli</span><b>{selected.referral.specialty}</b></div>
     <div><span>Nomor Rujukan</span><b>{selected.referral.refNumber}</b></div>
     <div><span>Dokter Perujuk</span><b>{selected.referral.doctor}</b></div>
+    <div><span>Dokter Spesialis Tujuan</span><b>{selected.referral.specialistDoctor||"Perlu konfirmasi"}</b></div>
     <div><span>Diagnosis</span><b>{selected.referral.diagnosis}</b></div>
     <div><span>Indikasi Medis</span><b>{selected.referral.reason}</b></div>
     <div><span>Referensi Dokumen</span><b>{selected.referral.documentReference}</b></div>
