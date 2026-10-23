@@ -17,6 +17,7 @@ import BenefitCoverage from "./BenefitCoverage";
 import {ProviderReferrals,CallCenterReferrals} from "./ReferralPanels";
 import {makeProviderDemoCases} from "../lib/demo-transactions";
 import type {ReferralDraft,ReferralRequest,ReferralStatus} from "./ReferralPanels";
+import {REFERRAL_MAX_VISITS,referralEligibility,referralExpiresAt} from "./referral-validity";
 
 type Role="provider"|"callcenter";
 type CaseStatus="Waiting Admission"|"Treatment Active"|"Waiting Treatment Approval"|"Treatment Approved"|"Waiting Discharge"|"Closed"|"Waiting Inpatient Approval"|"Inpatient Active"|"Waiting Inpatient Extension"|"Waiting Inpatient Discharge";
@@ -38,9 +39,11 @@ type ClaimSubmission={
  claimProkes:boolean;submittedAt:number;documents:ClaimDocument[];bundleId?:string;bundleCaseIds?:string[];bundleTotalBill?:number;files?:CaseFileMeta[];
 };
 type CaseHistory={at:number;actor:string;event:string;detail?:string};
-type CareCase={id:string;name:string;memberId:string;company:string;provider:string;providerCode?:string;status:CaseStatus;urgent:boolean;submittedAt:number;issue:string;visitType:string;careLevel?:"FKTP"|"FKRTL";accessRoute?:"FKTP"|"Emergency"|"Referral";parentCaseId?:string;originReferralId?:string;specialty?:string;referral?:ReferralRequest;urgencyReason?:string;policyNo?:string;planName?:string;
+type TreatmentPriceVersion={version:number;amount:number;at:number;actor:string;note:string};
+type CareCase={id:string;name:string;memberId:string;company:string;provider:string;providerCode?:string;status:CaseStatus;urgent:boolean;submittedAt:number;issue:string;visitType:string;careLevel?:"FKTP"|"FKRTL";accessRoute?:"FKTP"|"Emergency"|"Referral";parentCaseId?:string;originReferralId?:string;specialty?:string;specialistDoctor?:string;referral?:ReferralRequest;urgencyReason?:string;policyNo?:string;planName?:string;
  treatmentRequest?:{diagnosis:string;procedure:string;medication:string;reason?:string;attachments?:string[];estimatedCost:number;submittedAt:number};
- treatmentApproval?:{doctor:string;note:string;approvedAt:number};
+ treatmentApproval?:{doctor:string;note:string;approvedAt:number;finalCost?:number};
+ treatmentPricing?:{versions:TreatmentPriceVersion[];finalAmount?:number;finalizedAt?:number};
  dischargeRequest?:{finalDiagnosis:string;finalBill:number;notes:string;submittedAt:number;fileIds?:string[]};
  dischargeApproval?:{doctor:string;note:string;approvedAt:number};
  confirmation?:{stage:"Admission"|"Treatment"|"Discharge"|"Inpatient";reason:string;requestedAt:number;response?:string;respondedAt?:number};
@@ -244,6 +247,7 @@ export default function Page(){
  const [medicalModal,setMedicalModal]=useState<{caseId:string;stage:"Treatment"|"Discharge"}|null>(null);
  const [medicalDoctor,setMedicalDoctor]=useState("");
  const [medicalNote,setMedicalNote]=useState("");
+ const [medicalPrice,setMedicalPrice]=useState("");
  const [dischargeEvidenceReviewed,setDischargeEvidenceReviewed]=useState(false);
  const [inpatientReview,setInpatientReview]=useState<{caseId:string;mode:"admission"|"extension"|"billing"}|null>(null);
  const [extendCaseId,setExtendCaseId]=useState<string|null>(null);
@@ -590,7 +594,7 @@ export default function Page(){
     provider:referral.targetProviderName,providerCode:referral.targetProviderCode,
     status:"Treatment Active",urgent:false,submittedAt:at,issue:"Rujukan spesialis: "+referral.diagnosis,
     visitType:"Rawat Jalan Spesialis",careLevel:"FKRTL",accessRoute:"Referral",
-    parentCaseId:origin.id,originReferralId:referral.id,specialty:referral.specialty,
+    parentCaseId:origin.id,originReferralId:referral.id,specialty:referral.specialty,specialistDoctor:referral.specialistDoctor,
     policyNo:origin.policyNo,planName:origin.planName,
     history:[{at,actor:"Call Center — "+verifier.trim(),event:"Referral Approved / Admission FKRTL Automatic",
      detail:"FKTP "+origin.provider+" ("+origin.id+") → FKRTL "+referral.targetProviderName+" · "+referral.specialty+" · "+note.trim()}]
@@ -620,7 +624,8 @@ export default function Page(){
    const at=Date.now();
    setCases(v=>v.map(c=>c.id===caseId?withHistory({...c,status:"Waiting Treatment Approval",submittedAt:at,
     files:[...(c.files||[]),...files],
-    treatmentRequest:{diagnosis:treatmentDiagnosis.trim(),procedure:treatmentProcedure.trim(),medication:treatmentMedication.trim(),reason:treatmentReason.trim(),
+    treatmentPricing:{versions:[{version:1,amount:parseAmount(treatmentCost),at,actor:c.provider,note:"Estimasi awal Provider"}]},
+     treatmentRequest:{diagnosis:treatmentDiagnosis.trim(),procedure:treatmentProcedure.trim(),medication:treatmentMedication.trim(),reason:treatmentReason.trim(),
      attachments:files.map(x=>x.name),estimatedCost:parseAmount(treatmentCost),submittedAt:at}},
     "Treatment Request Submitted",c.provider,treatmentDiagnosis.trim()+(files.length?" · "+files.length+" dokumen dilampirkan":""),at):c));
    setPendingTreatmentFiles([]);
@@ -930,7 +935,7 @@ export default function Page(){
  function approveMedical(id:string,stage:"Treatment"|"Discharge"){
   const current=cases.find(c=>c.id===id);
   if(role!=="callcenter"||!current||current.status!==(stage==="Treatment"?"Waiting Treatment Approval":"Waiting Discharge"))return;
-  setMedicalModal({caseId:id,stage});setMedicalDoctor("");setMedicalNote("");setDischargeEvidenceReviewed(false);setShowCaseDetail(false);
+  setMedicalModal({caseId:id,stage});setMedicalDoctor("");setMedicalNote("");setMedicalPrice(stage==="Treatment"?formatAmountInput(String(current.treatmentPricing?.versions.at(-1)?.amount??current.treatmentRequest?.estimatedCost??0)):"");setDischargeEvidenceReviewed(false);setShowCaseDetail(false);
  }
  function submitMedicalApproval(){
   if(!medicalModal||!medicalDoctor.trim()||!medicalNote.trim()||role!=="callcenter")return;
