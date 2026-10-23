@@ -103,7 +103,7 @@ export function makeProviderDemoCases(activeMembers:DemoMember[]):{cases:DemoCas
    const refId="SIM-RF-"+batch+"-"+(i+1),childId="SIM-FKRTL-"+batch+"-"+(i+1);
    const referral:ReferralRequest={
     id:refId,refNumber:"RUJ/SIM/"+(i+1)+"/"+batch,
-    specialty:approved?"THT":"Penyakit Dalam",doctor:"dr. Simulasi FKTP",
+    specialty:approved?"THT":"Penyakit Dalam",doctor:"dr. Simulasi FKTP",specialistDoctor:"dr. Spesialis Simulasi",
     diagnosis,reason:"Pemeriksaan spesialis (simulasi)",documentReference:"DOK-SIM-"+batch+"-"+(i+1),
     kind:provider.code==="PRV-HERMINA-KMY-001"?"Internal (Satu Atap)":"Eksternal",
     sourceCaseId:id,sourceProviderCode:provider.code,targetProviderCode:providers[0].code,targetProviderName:providers[0].name,
