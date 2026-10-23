@@ -9,6 +9,7 @@ type Props={role:Role;view:string;onNavigate:(view:string,resetFilter?:boolean)=
 
 const providerGroups:Group[]=[
  {key:"service",label:"Operasional Pelayanan",icon:Stethoscope,items:[
+  {label:"Proses Berjalan",view:"active-cases",icon:Activity,resetFilter:true},
   {label:"Admission Peserta",view:"registration",icon:UserRound,resetFilter:true},
   {label:"Kunjungan Pasien",view:"cases",icon:Activity,resetFilter:true},
   {label:"Rujukan",view:"referrals",icon:ArrowRight,resetFilter:true},
@@ -39,6 +40,7 @@ const callCenterGroups:Group[]=[
   {label:"Klaim Provider",view:"claim",route:"history",icon:FileSpreadsheet}
  ]},
  {key:"oversight",label:"Monitoring",icon:FileCheck2,items:[
+  {label:"Proses Berjalan",view:"active-cases",icon:Activity,resetFilter:true},
   {label:"Audit Trail",view:"audit",icon:FileCheck2}
  ]}
 ];
