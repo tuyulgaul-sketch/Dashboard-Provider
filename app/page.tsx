@@ -367,7 +367,7 @@ export default function Page(){
  function addPendingFiles(stage:"admission"|"comment"|"treatment"|"discharge"|"inpatient",files:File[]){
   if(!files.length)return;
   const current=stage==="admission"?pendingAdmissionFiles:stage==="comment"?pendingCommentFiles:stage==="treatment"?pendingTreatmentFiles:stage==="inpatient"?pendingInpatientFiles:pendingDischargeFiles;
-  const existing=stage==="admission"?[]:selectedCase?.files||[];
+  const existing=stage==="admission"?[]:(selectedCase?.files||[]).filter(f=>f.origin===stage);
   try{
    validateCaseFiles(existing,current,files,stage==="admission"?{maxBytes:ADMISSION_FILE_TOTAL_BYTES,admissionTypesOnly:true}:undefined);
    const updated=[...current,...files];
@@ -615,7 +615,7 @@ export default function Page(){
   const caseId=selectedCase.id;
   setUploadBusy(true);setAttachmentError("");
   try{
-   validateCaseFiles(selectedCase.files||[],[],pendingTreatmentFiles);
+   validateCaseFiles((selectedCase.files||[]).filter(f=>f.origin==="treatment"),[],pendingTreatmentFiles);
    const files=await saveCaseFiles(caseId,pendingTreatmentFiles,"treatment");
    const at=Date.now();
    setCases(v=>v.map(c=>c.id===caseId?withHistory({...c,status:"Waiting Treatment Approval",submittedAt:at,
@@ -654,7 +654,7 @@ export default function Page(){
   if(!c||!canStartInpatient(c)||uploadBusy)return;
   setUploadBusy(true);setAttachmentError("");
   try{
-   validateCaseFiles(c.files||[],[],pendingInpatientFiles);
+   validateCaseFiles((c.files||[]).filter(f=>f.origin==="inpatient"),[],pendingInpatientFiles);
    const files=await saveCaseFiles(c.id,pendingInpatientFiles,"inpatient");
    const at=Date.now();
    const episode:InpatientEpisode={state:"Waiting Approval",request,requestedAt:at,extensions:[]};
@@ -700,7 +700,7 @@ export default function Page(){
   if(totalSubmitted(bill.lines)<=0){setAttachmentError("Total biaya yang diajukan harus lebih dari Rp0.");return;}
   setUploadBusy(true);setAttachmentError("");
   try{
-   validateCaseFiles(c.files||[],[],pendingDischargeFiles);
+   validateCaseFiles((c.files||[]).filter(f=>f.origin==="discharge"),[],pendingDischargeFiles);
    const files=await saveCaseFiles(c.id,pendingDischargeFiles,"discharge");
    const at=Date.now(),total=totalSubmitted(bill.lines);
    setCases(v=>v.map(x=>x.id===c.id&&x.inpatient?withHistory({...x,
@@ -778,7 +778,7 @@ export default function Page(){
   const caseId=selectedCase.id;
   setUploadBusy(true);setAttachmentError("");
   try{
-   validateCaseFiles(selectedCase.files||[],[],pendingDischargeFiles);
+   validateCaseFiles((selectedCase.files||[]).filter(f=>f.origin==="discharge"),[],pendingDischargeFiles);
    const files=await saveCaseFiles(caseId,pendingDischargeFiles,"discharge");
    const at=Date.now();
    setCases(v=>v.map(c=>c.id===caseId?withHistory({
@@ -807,7 +807,7 @@ export default function Page(){
   const entryId="CM-"+at.toString(36)+"-"+Math.random().toString(36).slice(2,8);
   setUploadBusy(true);setAttachmentError("");
   try{
-   validateCaseFiles(selectedCase.files||[],[],pendingCommentFiles);
+   validateCaseFiles((selectedCase.files||[]).filter(f=>f.origin==="comment"),[],pendingCommentFiles);
    const files=await saveCaseFiles(caseId,pendingCommentFiles,"comment",entryId);
    const text=commentText.trim()||(files.length?"Mengirim "+files.length+" dokumen pendukung.":"");
    const entry:CaseComment={
@@ -1138,7 +1138,7 @@ export default function Page(){
   {role==="provider"&&actionModal==="inpatient-form"&&selectedCase&&inpatientHospital(selectedCase)&&!selectedCase.inpatient&&
    <WorkflowModal title="Ajukan Rawat Inap" description={selectedCase.id+" · "+selectedCase.name+" · Menunggu persetujuan Call Center"} onClose={closeActionModal}><InpatientRequestForm key={selectedCase.id} patient={inpatientPatient(selectedCase)}
     onSubmit={form=>requestConfirmation("Konfirmasi Rawat Inap","Periksa diagnosis, indikasi medis, jenis plan, lama rawat, dan pengesahan dokter. Pengajuan akan menunggu approval Call Center.",()=>{void submitInpatientRequest(form);})} onCancel={closeActionModal}
-     uploadSlot={<div className="treatmentUploadCard"><CaseFilePicker title="Dokumen Pendukung Rawat Inap" existing={selectedCase.files||[]} pending={pendingInpatientFiles} disabled={uploadBusy} onAdd={files=>addPendingFiles("inpatient",files)} onRemove={i=>removePendingFile("inpatient",i)}/>{attachmentError&&<div className="caseUploadError" role="alert">{attachmentError}</div>}</div>}/></WorkflowModal>}
+     uploadSlot={<div className="treatmentUploadCard"><CaseFilePicker title="Dokumen Pendukung Rawat Inap" existing={(selectedCase.files||[]).filter(f=>f.origin==="inpatient")} pending={pendingInpatientFiles} disabled={uploadBusy} onAdd={files=>addPendingFiles("inpatient",files)} onRemove={i=>removePendingFile("inpatient",i)}/>{attachmentError&&<div className="caseUploadError" role="alert">{attachmentError}</div>}</div>}/></WorkflowModal>}
 
   {role==="provider"&&actionModal==="inpatient-billing"&&selectedCase?.inpatient?.state==="Active"&&
    <WorkflowModal title="Ajukan Discharge Rawat Inap" description={selectedCase.id+" · "+selectedCase.name+" · Review perhitungan pulang"} onClose={closeActionModal} busy={uploadBusy}><InpatientBillingForm key={selectedCase.id} patient={inpatientPatient(selectedCase)} episode={selectedCase.inpatient}
@@ -1146,7 +1146,7 @@ export default function Page(){
     uploadSlot={<div className="inpatientRequiredReceipt">
      <h3>5. Bukti Tagihan Rawat Inap (Wajib)</h3>
      <p>Lampirkan kwitansi, rincian biaya, atau bukti tagihan pendukung. Mengikuti kuota lampiran case existing: maksimum 10 file dengan total 10 MB.</p>
-     <CaseFilePicker required title="Bukti Billing Pasien Pulang" existing={selectedCase.files||[]} pending={pendingDischargeFiles}
+     <CaseFilePicker required title="Bukti Billing Pasien Pulang" existing={(selectedCase.files||[]).filter(f=>f.origin==="discharge")} pending={pendingDischargeFiles}
       disabled={uploadBusy} onAdd={files=>addPendingFiles("discharge",files)} onRemove={index=>removePendingFile("discharge",index)}/>
      {attachmentError&&<div className="caseUploadError" role="alert">{attachmentError}</div>}
     </div>}/></WorkflowModal>}
@@ -1160,7 +1160,7 @@ export default function Page(){
     <label className="full">Obat / Resep<textarea value={treatmentMedication} onChange={e=>setTreatmentMedication(e.target.value)} placeholder="Nama obat, dosis, frekuensi, durasi, qty bila ada"/></label>
    </div>
    <div className="treatmentReasonCard"><div><b>Alasan / Dasar Pemberian Treatment *</b><span>Jelaskan pertimbangan klinis mengapa obat, pemeriksaan, atau tindakan ini diperlukan.</span></div><textarea value={treatmentReason} onChange={e=>setTreatmentReason(e.target.value)} placeholder="Contoh: berdasarkan diagnosis dan hasil pemeriksaan awal, diperlukan ..."/></div>
-   <div className="treatmentUploadCard"><CaseFilePicker title="Dokumen Pendukung Treatment" existing={selectedCase.files||[]} pending={pendingTreatmentFiles} disabled={uploadBusy} onAdd={files=>addPendingFiles("treatment",files)} onRemove={index=>removePendingFile("treatment",index)}/></div>
+   <div className="treatmentUploadCard"><CaseFilePicker title="Dokumen Pendukung Treatment" existing={(selectedCase.files||[]).filter(f=>f.origin==="treatment")} pending={pendingTreatmentFiles} disabled={uploadBusy} onAdd={files=>addPendingFiles("treatment",files)} onRemove={index=>removePendingFile("treatment",index)}/></div>
    {attachmentError&&<div className="caseUploadError" role="alert">{attachmentError}</div>}
    <div className="workflowActions"><span>Request ini akan masuk ke Waiting Treatment Approval.</span><button className="primary" disabled={uploadBusy||!treatmentDiagnosis.trim()||!treatmentProcedure.trim()||!treatmentReason.trim()||!treatmentCost.trim()} onClick={()=>requestConfirmation("Konfirmasi Treatment","Request ini akan masuk ke antrean verifikasi medis dan biaya Call Center PertaLife.",()=>{void submitTreatment();})}>Submit Treatment Request <ArrowRight size={17}/></button></div>
   </section></WorkflowModal>}
@@ -1175,7 +1175,7 @@ export default function Page(){
    <div className="dischargeBillEvidence">
     <div className="dischargeBillHead"><FileCheck2 size={20}/><div><strong>Bukti Tagihan Final Bill <span className="dischargeRequiredTag">WAJIB</span></strong><p>Unggah kwitansi, invoice, rincian biaya, atau bukti tagihan lainnya yang mendasari nominal Final Bill. Dokumen akan diperiksa Call Center sebelum approval.</p></div></div>
     <div className="dischargeBillAmount"><span>Nilai yang dimintakan persetujuan</span><strong>{formatRupiah(parseAmount(finalBill))}</strong></div>
-    <CaseFilePicker required title="Unggah Kwitansi / Invoice / Rincian Biaya" existing={selectedCase.files||[]} pending={pendingDischargeFiles} disabled={uploadBusy} onAdd={files=>addPendingFiles("discharge",files)} onRemove={index=>removePendingFile("discharge",index)}/>
+    <CaseFilePicker required title="Unggah Kwitansi / Invoice / Rincian Biaya" existing={(selectedCase.files||[]).filter(f=>f.origin==="discharge")} pending={pendingDischargeFiles} disabled={uploadBusy} onAdd={files=>addPendingFiles("discharge",files)} onRemove={index=>removePendingFile("discharge",index)}/>
     {!pendingDischargeFiles.length&&<small className="dischargeBillHint">Tambahkan minimal 1 file sebagai dasar tagihan. Total seluruh lampiran case tetap maksimal 10 file / 10 MB.</small>}
     {attachmentError&&<div className="caseUploadError" role="alert">{attachmentError}</div>}
    </div>
@@ -1431,7 +1431,7 @@ export default function Page(){
      </div>
      <label htmlFor="case-comment-input">Isi komentar</label>
      <textarea id="case-comment-input" rows={3} maxLength={4000} value={commentText} onChange={event=>setCommentText(event.target.value)} placeholder={role==="provider"&&awaitingProviderResponse?"Tulis jawaban atau klarifikasi untuk Call Center...":commentMode==="need"?"Jelaskan dokumen atau informasi yang harus dikonfirmasi Provider...":"Tulis catatan untuk pihak lain terkait case ini..."} required={role==="callcenter"||pendingCommentFiles.length===0}/>
-     {role==="provider"&&<CaseFilePicker title="Lampirkan Bukti / Dokumen" existing={caseFileList} pending={pendingCommentFiles} disabled={uploadBusy} onAdd={files=>addPendingFiles("comment",files)} onRemove={index=>removePendingFile("comment",index)}/>}
+     {role==="provider"&&<CaseFilePicker title="Lampirkan Bukti / Dokumen" existing={caseFileList.filter(f=>f.origin==="comment")} pending={pendingCommentFiles} disabled={uploadBusy} onAdd={files=>addPendingFiles("comment",files)} onRemove={index=>removePendingFile("comment",index)}/>}
      {attachmentError&&<div className="caseUploadError" role="alert">{attachmentError}</div>}
      <div className="caseCommentActions"><span>Pesan menjadi history case dan ditandai sebagai komentar baru untuk pihak penerima.</span><button type="submit" className="primary" disabled={uploadBusy||(!commentText.trim()&&!pendingCommentFiles.length)}><Send size={15}/>{role==="provider"&&awaitingProviderResponse?"Kirim Respons":commentMode==="need"&&confirmationStage?"Kirim Need Confirmation":"Kirim Komentar"}</button></div>
     </form>
