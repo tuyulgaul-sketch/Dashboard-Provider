@@ -177,7 +177,7 @@ const claimDocumentLabels=[
  "Resep Asli / Carbonized (Provider)"
 ];
 
-function fmt(ms:number){const s=Math.max(0,Math.floor(ms/1000));return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
+function fmt(ms:number){const s=Math.max(0,Math.floor(ms/1000));if(s>=86400){const days=Math.floor(s/86400),hours=Math.floor((s%86400)/3600);return days+" hari "+String(hours).padStart(2,"0")+" jam"}return String(Math.floor(s/3600)).padStart(2,"0")+":"+String(Math.floor((s%3600)/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
 function niceDate(v:string){if(!v)return "-";const d=new Date(v+"T00:00:00");return Number.isNaN(d.getTime())?v:new Intl.DateTimeFormat("id-ID",{day:"2-digit",month:"2-digit",year:"numeric"}).format(d)}
 function isActiveMember(m:Member){
  const today=new Date();today.setHours(0,0,0,0);
@@ -337,6 +337,7 @@ export default function Page(){
   return c.status.startsWith("Waiting")?"process":"history";
  }
  const filtered=visibleCases.filter(c=>(c.name+" "+c.memberId+" "+c.company+" "+c.id).toLowerCase().includes(query.toLowerCase())).filter(c=>{
+  if(view==="active-cases")return c.status!=="Closed";
   if(statusFilter==="Open")return c.status!=="Closed";
   if(statusFilter)return c.status===statusFilter;
   if(role==="provider"&&view==="registration")return worklistBucket(c)===worklistTab;
@@ -550,7 +551,8 @@ export default function Page(){
   if(!source||!eligibleReferralIds.includes(caseId)){setNotice("Rujukan hanya dapat dibuat dari episode FKTP yang sesuai dengan Faskes 1 dan sudah disetujui Call Center.");return;}
   const at=Date.now();
   const referral:ReferralRequest={
-   ...draft,id:source.referral?.id||"RF-"+at.toString(36).toUpperCase(),
+   ...draft,refNumber:source.referral?.refNumber||"RJ-"+new Date(at).toISOString().slice(0,10).replaceAll("-","")+"-"+at.toString(36).toUpperCase(),
+   id:source.referral?.id||"RF-"+at.toString(36).toUpperCase(),
    kind:source.providerCode==="PRV-HERMINA-KMY-001"?"Internal (Satu Atap)":"Eksternal",
    sourceCaseId:source.id,sourceProviderCode:source.providerCode||"",
    targetProviderCode:"PRV-HERMINA-KMY-001",targetProviderName:"RS Hermina Kemayoran",
@@ -968,7 +970,7 @@ export default function Page(){
  },[submitConfirmation]);
  function closeActionModal(){if(uploadBusy)return;setActionModal(null);setSelectedCaseId(null);setAttachmentError("");setClaimFileError("");}
  function renderProviderActions(c:CareCase){
-  const all=view==="cases",inpatientView=all||view==="inpatient-list";
+  const all=view==="cases"||view==="active-cases",inpatientView=all||view==="inpatient-list";
   return <div className="actions providerActions">
    <button type="button" onClick={()=>openCaseDetail(c.id)}><Eye size={15}/>Detail & Timeline{unreadFor(c.id)>0&&<span className="caseUnreadBadge">{unreadFor(c.id)>99?"99+":unreadFor(c.id)}</span>}</button>
    {inpatientView&&canStartInpatient(c)&&<button type="button" className="approve" onClick={()=>startInpatient(c.id)}><BedDouble size={15}/>Ajukan Rawat Inap</button>}
@@ -1437,7 +1439,7 @@ export default function Page(){
    <div className="caseEvidence">
     <div className="caseSubhead"><Upload size={17}/><div><b>Lampiran Case</b><span>Dokumen Admission, Treatment, Discharge (bukti tagihan), dan komentar. File dapat diunduh dari browser tempat file diunggah.</span></div></div>
     <div className="evidenceList">
-     {caseFileList.map(file=><button type="button" className="caseStoredFile" key={file.id} onClick={()=>downloadStoredAttachment(file)}><FileSpreadsheet size={15}/><span>{file.name}</span><small>{file.origin==="admission"?"Admission":file.origin==="treatment"?"Treatment":file.origin==="discharge"?"Bukti Tagihan Discharge":file.origin==="comment"?"Komentar":"Klaim"} · {fileSizeLabel(file.size)}</small></button>)}
+     {caseFileList.map(file=><button type="button" className="caseStoredFile" key={file.id} onClick={()=>downloadStoredAttachment(file)}><FileSpreadsheet size={15}/><span>{file.name}</span><small>{file.origin==="admission"?"Admission":file.origin==="inpatient"?"Rawat Inap":file.origin==="treatment"?"Treatment":file.origin==="discharge"?"Bukti Tagihan Discharge":file.origin==="comment"?"Komentar":"Klaim"} · {fileSizeLabel(file.size)}</small></button>)}
      {!caseFileList.length&&selectedCase.treatmentRequest?.attachments?.length?selectedCase.treatmentRequest.attachments.map(name=><span key={"tr-"+name}><FileSpreadsheet size={14}/>{name}<small>Treatment</small></span>):null}
      {selectedCase.claimSubmission?.documents?.filter(d=>d.fileName).map(d=><span key={"cl-"+d.label}><FileSpreadsheet size={14}/>{d.fileName}<small>{d.label}</small></span>)}
      {!caseFileList.length&&!selectedCase.treatmentRequest?.attachments?.length&&!selectedCase.claimSubmission?.documents?.some(d=>d.fileName)&&<div className="emptyEvidence">Belum ada lampiran pada case ini.</div>}
@@ -1463,9 +1465,10 @@ export default function Page(){
    </tbody></table></div>
   </section>}
 
-  {(view==="queue"||view==="registration"||view==="treatment"||view==="discharge"||view==="cases"||view==="audit"||view==="inpatient-list"||view==="inpatient-approvals")&&<section id="case-queue" className="card queue">
-   <div className="sectionHead"><div><h2>{role==="provider"?(view==="registration"?"Admission / Pendaftaran":view==="treatment"?"Treatment Cases":view==="discharge"?"Discharge Cases":view==="inpatient-list"?"Rawat Inap Peserta":"Case Peserta"):view==="inpatient-approvals"?"Verifikasi Rawat Inap":"Real-time Verification Queue"}</h2><p>{role==="provider"?"Data case mengikuti menu yang sedang dibuka.":"Buka detail case sebelum melakukan verifikasi bila perlu."}</p></div><div className="caseQueueTools">{unreadTotal>0&&<span className="caseQueueUnread"><MessageSquareText size={14}/>{unreadTotal} komentar baru</span>}<div className="search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Cari case, nama, CARD NO..."/></div></div></div>
-   {role==="provider"&&providerWorklistViews.includes(view)&&<div className="providerWorklistBar">
+  {(view==="queue"||view==="active-cases"||view==="registration"||view==="treatment"||view==="discharge"||view==="cases"||view==="audit"||view==="inpatient-list"||view==="inpatient-approvals")&&<section id="case-queue" className="card queue">
+   <div className="sectionHead"><div><h2>{role==="provider"?(view==="registration"?"Admission / Pendaftaran":view==="treatment"?"Treatment Cases":view==="discharge"?"Discharge Cases":view==="inpatient-list"?"Rawat Inap Peserta":view==="active-cases"?"Seluruh Proses Berjalan":"Case Peserta"):view==="inpatient-approvals"?"Verifikasi Rawat Inap":"Real-time Verification Queue"}</h2><p>{role==="provider"?"Data case mengikuti menu yang sedang dibuka.":"Buka detail case sebelum melakukan verifikasi bila perlu."}</p></div><div className="caseQueueTools">{unreadTotal>0&&<span className="caseQueueUnread"><MessageSquareText size={14}/>{unreadTotal} komentar baru</span>}<div className="search"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Cari case, nama, CARD NO..."/></div></div></div>
+   {view==="active-cases"&&<div className="providerWorklistBar"><span className="countPill">{visibleCases.filter(c=>c.status!=="Closed").length} episode aktif</span><span className="countPill">{visibleCases.filter(c=>c.status.startsWith("Waiting")).length} menunggu approval</span><span className="countPill">{visibleCases.filter(c=>c.status==="Treatment Active").length} treatment aktif</span><span className="countPill">{visibleCases.filter(c=>c.status==="Inpatient Active").length} rawat inap aktif</span></div>}
+    {role==="provider"&&providerWorklistViews.includes(view)&&<div className="providerWorklistBar">
     <div className="providerWorklistTabs" role="group" aria-label="Status pekerjaan">
      {([{key:"action",label:"Perlu Tindakan"},{key:"process",label:"Dalam Proses"},{key:"history",label:"Riwayat"}] as const).map(tab=><button key={tab.key} type="button" className={worklistTab===tab.key?"selected":""} aria-pressed={worklistTab===tab.key} onClick={()=>{setWorklistTab(tab.key);setStatusFilter(null)}}>{tab.label}</button>)}
     </div>
