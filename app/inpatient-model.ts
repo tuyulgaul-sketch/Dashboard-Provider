@@ -82,7 +82,8 @@ export function blankInpatientBilling(admissionDate:string):InpatientBilling{
 }
 export function validateInpatientRequest(x:InpatientForm):string|null{
  if(!x.admissionDate||!x.admissionDiagnosis.trim()||!x.mainComplaint.trim()||!x.diagnosis.trim()||!x.physicianName.trim())return "Tanggal masuk, diagnosis masuk, keluhan utama, diagnosis dan nama dokter pemeriksa wajib diisi.";
- if(!x.roomClass.trim()||!x.roomRate||x.roomRate<0)return "Isi kelas kamar dan tarif kamar per hari.";
+ if(!["Supra","Utama","Madya","Standar"].includes(x.managedCarePlan))return "Pilih Jenis Plan: Supra, Utama, Madya, atau Standar.";
+ if(x.admissionDate!==isoToday())return "Tanggal admission dikunci pada tanggal hari ini. Perubahan tanggal memerlukan bypass resmi Call Center.";
  if(!Number.isInteger(x.estimatedDays)||x.estimatedDays<1||x.estimatedDays>180)return "Estimasi lama rawat harus 1–180 hari.";
  if(!x.carePurpose)return "Tentukan tujuan perawatan.";
  return null;
