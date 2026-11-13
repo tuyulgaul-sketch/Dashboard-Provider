@@ -71,3 +71,17 @@ export async function downloadCaseFile(meta:CaseFileMeta):Promise<void>{
  // Release after the browser has started processing the click.
  window.setTimeout(()=>URL.revokeObjectURL(url),3000);
 }
+
+/** Clear only this prototype's case attachments, not other browser databases. */
+export async function clearAllCaseFiles():Promise<void>{
+ const db=await openCaseFileDb();
+ try{
+  await new Promise<void>((resolve,reject)=>{
+   const tx=db.transaction(STORE,"readwrite");
+   tx.objectStore(STORE).clear();
+   tx.oncomplete=()=>resolve();
+   tx.onerror=()=>reject(tx.error||new Error("Gagal menghapus lampiran case."));
+   tx.onabort=()=>reject(tx.error||new Error("Penghapusan lampiran case dibatalkan."));
+  });
+ }finally{db.close();}
+}

@@ -3,7 +3,7 @@ import {useEffect,useMemo,useRef,useState} from "react";
 import {createPortal} from "react-dom";
 import {caseComments,commentReadKey,unreadCaseComments} from "./case-comments";
 import type {CaseComment,CommentKind,ConfirmationStage} from "./case-comments";
-import {downloadCaseFile,fileSizeLabel,saveCaseFiles,validateCaseFiles} from "./case-files";
+import {clearAllCaseFiles,downloadCaseFile,fileSizeLabel,saveCaseFiles,validateCaseFiles} from "./case-files";
 import CaseFilePicker from "./CaseFilePicker";
 import {InpatientRequestForm,InpatientBillingForm,InpatientReviewModal} from "./InpatientPanels";
 import {isHospitalEligible,isoToday,dateOffset,isExtensionWindow,totalSubmitted,withComputedExcess} from "./inpatient-model";
@@ -12,6 +12,9 @@ import {claimTypeFromAdmission,claimTypeSummary,validateClaimFiles,CLAIM_MAX_FIL
 import type {CaseFileMeta} from "./case-files";
 import {Activity,AlertTriangle,ArrowRight,Building2,CheckCircle2,ChevronDown,ChevronLeft,ChevronRight,Clock3,BedDouble,Database,Eye,FileCheck2,FileSpreadsheet,MessageSquareText,Plus,Search,Send,Settings,ShieldCheck,Stethoscope,Trash2,Upload,UserRound,X} from "lucide-react";
 import SidebarNavigation from "./SidebarNavigation";
+import "./reset-data.css";
+import ResetDataDialog from "./ResetDataDialog";
+import type {ResetScope} from "./ResetDataDialog";
 import WorkflowModal from "./WorkflowModal";
 import BenefitCoverage from "./BenefitCoverage";
 import {ProviderReferrals,CallCenterReferrals} from "./ReferralPanels";
@@ -216,6 +219,7 @@ export default function Page(){
  const [fkrtlBenefitCard,setFkrtlBenefitCard]=useState<string|null>(null);
  const [urgent,setUrgent]=useState(false),[urgencyReason,setUrgencyReason]=useState(""),[urgencyText,setUrgencyText]=useState(""),[complaint,setComplaint]=useState("");
  const [view,setView]=useState("dashboard"),[notice,setNotice]=useState("");
+ const [resetDialogOpen,setResetDialogOpen]=useState(false);
  const [actionModal,setActionModal]=useState<"admission"|"treatment"|"discharge"|"inpatient-form"|"inpatient-billing"|"bundle-picker"|"claim"|null>(null);
  const [worklistTab,setWorklistTab]=useState<"action"|"process"|"history">("action");
  const [submitConfirmation,setSubmitConfirmation]=useState<{title:string;detail:string;proceed:()=>void}|null>(null);
@@ -262,6 +266,8 @@ export default function Page(){
    if(event.storageArea!==localStorage||!event.newValue)return;
    try{
     if(event.key==="pertalife-managed-care-cases")setCases(JSON.parse(event.newValue));
+    if(event.key==="pertalife-managed-care-members-v2")setMembers(JSON.parse(event.newValue));
+    if(event.key==="pertalife-managed-care-provider-profiles")setProviderProfiles({...defaultProviderProfiles,...JSON.parse(event.newValue)});
     if(event.key==="pertalife-managed-care-comment-read-v1")setCommentReadAt(JSON.parse(event.newValue));
    }catch{}
   };
@@ -509,6 +515,28 @@ export default function Page(){
   if(!window.confirm("Hapus "+demoCount+" transaksi DUMMY? Master peserta dan transaksi lainnya tidak ikut terhapus."))return;
   setCases(prev=>prev.filter(c=>!c.demo));setSelectedCaseId(null);setShowCaseDetail(false);
   setSelectedClaimCases([]);setStatusFilter(null);setNotice("Transaksi DUMMY dihapus; master peserta dan transaksi biasa tetap tersimpan.");
+ }
+ async function resetPrototypeData(scope:ResetScope){
+  if(role!=="callcenter")throw new Error("Reset data hanya tersedia pada tampilan Call Center PertaLife.");
+  if(!hydrated||uploadBusy)throw new Error("Tunggu sampai data selesai dimuat dan upload dokumen selesai.");
+  // Clear this prototype's IndexedDB attachment store before dropping references.
+  await clearAllCaseFiles();
+  setCases([]);
+  setCommentReadAt({});
+  setSelectedCaseId(null);setShowCaseDetail(false);setReferralModalCaseId(null);
+  setActionModal(null);setSubmitConfirmation(null);
+  setClaimDraft(null);setSelectedClaimCases([]);setExpandedClaimId(null);
+  setMedicalModal(null);setInpatientReview(null);setExtendCaseId(null);
+  setPendingAdmissionFiles([]);setPendingCommentFiles([]);setPendingTreatmentFiles([]);setPendingDischargeFiles([]);setPendingClaimFiles([]);
+  setAttachmentError("");setClaimFileError("");
+  setQuery("");setStatusFilter(null);setWorklistTab("action");setReferralSearch("");setFkrtlBenefitCard(null);
+  setCardNo("");setFound(null);setLookupDone(false);setUploadReview(null);setReviewFilter("all");
+  if(scope==="all"){
+   setMembers([]);setProviderProfiles({...defaultProviderProfiles});setProfileDraft(null);
+   setMemberQuery("");setMemberPage(1);setBankSearch("");setBankOpen(false);
+  }
+  setView("dashboard");
+  setNotice(scope==="all"?"Seluruh data uji, master peserta, profil provider, dan lampiran pada browser ini berhasil direset.":"Seluruh transaksi, riwayat, dan lampiran pada browser ini berhasil direset. Master Peserta dan profil Provider tetap tersimpan.");
  }
  function lookup(){const m=members.find(x=>x.cardNo.toLowerCase()===cardNo.trim().toLowerCase())||null;setFound(m);setLookupDone(true);setUrgent(false);setUrgencyReason("");setUrgencyText("");setComplaint("");setPendingAdmissionFiles([]);setAttachmentError("");}
  function chooseAccess(route:"FKTP"|"FKRTL"|"Emergency"){
@@ -988,6 +1016,7 @@ export default function Page(){
       <button className="primary" type="button" onClick={()=>{const run=submitConfirmation.proceed;setSubmitConfirmation(null);run();}}><CheckCircle2 size={16}/>Ya, Kirim Pengajuan</button></div>
     </div>
    </div>,document.body)}
+  {resetDialogOpen&&role==="callcenter"&&<ResetDataDialog caseCount={cases.length} memberCount={members.length} onClose={()=>setResetDialogOpen(false)} onConfirm={resetPrototypeData}/>}
   <main>
   <header><div><h1>{role==="provider"?(view==="dashboard"?"Provider Overview":"Provider Operations"):"Managed Care Command Center"}</h1><p>{role==="provider"?(view==="dashboard"?"Ringkasan pasien, provider, approval PertaLife, dan klaim. Seluruh transaksi melalui sidebar.":"Daftar pasien sesuai tahapan pelayanan; semua pengajuan melalui pop-up."):"Master peserta mengikuti struktur data Managed Care PertaLife."}</p></div><div className="switchWrap"><span className="switchLabel">Account Switcher</span>{unreadTotal>0&&<button type="button" className="caseUnreadGlobal" onClick={()=>{setStatusFilter(null);setView("cases");}} aria-label={unreadTotal+" komentar belum dibaca. Lihat daftar case."}><MessageSquareText size={15}/><span>{unreadTotal} baru</span></button>}<div className="account accountSelector"><div className="avatar">{role==="provider"?<Building2 size={18}/>:<ShieldCheck size={18}/>}</div><div className="accountSelectText"><b>{role==="provider"?activeProvider.name:"Call Center PertaLife"}</b><span>{role==="provider"?activeProvider.code:"Verifier 24/7"}</span></div><select aria-label="Account Switcher" value={role==="callcenter"?"callcenter":activeProvider.code} onChange={e=>{const v=e.target.value;if(v==="callcenter"){setRole("callcenter")}else{setRole("provider");setActiveProviderCode(v as typeof activeProviderCode)}setView("dashboard");setCareAccess("FKTP");setVisitType("Rawat Jalan");setReferralSearch("");setFkrtlBenefitCard(null);setNotice("");setFound(null);setLookupDone(false);setProfileDraft(null);setBankSearch("");setBankOpen(false)}}><option value="callcenter">Call Center PertaLife</option>{providerAccounts.map(p=><option key={p.code} value={p.code}>{p.name} — {p.code}</option>)}</select><ChevronDown size={17}/></div></div></header>
   {notice&&<div className="notice">{notice}</div>}
@@ -1007,7 +1036,7 @@ export default function Page(){
    </>}
    {role==="callcenter"&&(view==="dashboard"||view==="master")&&<section className="card">
     <div className="sectionHead"><div><h2>Simulasi Transaksi Provider</h2><p>Gunakan CARD NO, nama, polis, plan, dan Faskes 1 dari Master Peserta yang sudah di-upload Call Center. Tidak membuat akun peserta baru.</p></div><span className="countPill">{demoCount} transaksi DUMMY</span></div>
-    <div className="workflowActions"><span>{members.length} peserta di master browser ini · Contoh workflow FKTP, IGD, rujukan FKRTL, treatment, discharge, klaim, dan pembayaran simulasi.</span><div className="actions"><button type="button" className="primary" disabled={!hydrated||!members.length||demoCount>0} onClick={generateDummyTransactions}><Plus size={16}/>Buat Transaksi Dummy</button>{demoCount>0&&<button type="button" className="dangerBtn" onClick={deleteDummyTransactions}><Trash2 size={15}/>Hapus Dummy ({demoCount})</button>}</div></div>
+    <div className="workflowActions"><span>{members.length} peserta di master browser ini · Contoh workflow FKTP, IGD, rujukan FKRTL, treatment, discharge, klaim, dan pembayaran simulasi.</span><div className="actions"><button type="button" className="primary" disabled={!hydrated||!members.length||demoCount>0} onClick={generateDummyTransactions}><Plus size={16}/>Buat Transaksi Dummy</button>{demoCount>0&&<button type="button" className="dangerBtn" onClick={deleteDummyTransactions}><Trash2 size={15}/>Hapus Dummy ({demoCount})</button>}<button type="button" className="dangerBtn" disabled={!hydrated||uploadBusy} onClick={()=>setResetDialogOpen(true)}><Trash2 size={15}/>Reset Data</button></div></div>
     {members.length===0&&<small>Master Peserta belum tersedia di browser/domain ini. Upload master di menu Call Center → Master Peserta terlebih dahulu.</small>}
    </section>}
    {role==="callcenter"&&view==="master"&&<section className="card master">
