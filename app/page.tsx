@@ -19,6 +19,7 @@ import WorkflowModal from "./WorkflowModal";
 import BenefitCoverage from "./BenefitCoverage";
 import {ProviderReferrals,CallCenterReferrals} from "./ReferralPanels";
 import {makeProviderDemoCases} from "../lib/demo-transactions";
+import {DEMO_CARD_PREFIX,makeDemoMaster} from "../lib/demo-master";
 import type {ReferralDraft,ReferralRequest,ReferralStatus} from "./ReferralPanels";
 
 type Role="provider"|"callcenter";
@@ -254,7 +255,7 @@ export default function Page(){
  const [providerProfiles,setProviderProfiles]=useState<Record<string,ProviderProfile>>(defaultProviderProfiles),[profileDraft,setProfileDraft]=useState<ProviderProfile|null>(null),[bankSearch,setBankSearch]=useState(""),[bankOpen,setBankOpen]=useState(false);
  const [uploadReview,setUploadReview]=useState<UploadReview|null>(null); const [reviewFilter,setReviewFilter]=useState("all"); const [memberPage,setMemberPage]=useState(1); const [memberPageSize,setMemberPageSize]=useState(50);
 
- useEffect(()=>{try{const m=localStorage.getItem("pertalife-managed-care-members-v2"),c=localStorage.getItem("pertalife-managed-care-cases"),p=localStorage.getItem("pertalife-managed-care-provider-profiles");if(m)setMembers(JSON.parse(m));if(c)setCases(JSON.parse(c));if(p)setProviderProfiles({...defaultProviderProfiles,...JSON.parse(p)});}catch{}setHydrated(true);const t=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t)},[]);
+ useEffect(()=>{try{const m=localStorage.getItem("pertalife-managed-care-members-v2"),c=localStorage.getItem("pertalife-managed-care-cases"),p=localStorage.getItem("pertalife-managed-care-provider-profiles");if(m!==null)setMembers(JSON.parse(m));else setMembers(makeDemoMaster());if(c)setCases(JSON.parse(c));if(p)setProviderProfiles({...defaultProviderProfiles,...JSON.parse(p)});}catch{}setHydrated(true);const t=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t)},[]);
  useEffect(()=>{if(hydrated)localStorage.setItem("pertalife-managed-care-members-v2",JSON.stringify(members));},[members,hydrated]);
  useEffect(()=>{if(hydrated)localStorage.setItem("pertalife-managed-care-cases",JSON.stringify(cases));},[cases,hydrated]);
  useEffect(()=>{if(hydrated)localStorage.setItem("pertalife-managed-care-provider-profiles",JSON.stringify(providerProfiles));},[providerProfiles,hydrated]);
@@ -301,6 +302,7 @@ export default function Page(){
  const visibleCases=useMemo(()=>role==="provider"?cases.filter(c=>c.providerCode===activeProvider.code||(!c.providerCode&&c.provider===activeProvider.name)):cases,[cases,role,activeProvider.code,activeProvider.name]);
  const waiting=useMemo(()=>visibleCases.filter(c=>c.status.startsWith("Waiting")),[visibleCases]);
  const demoCount=cases.filter(c=>c.demo).length;
+ const demoMasterCount=members.filter(m=>m.cardNo.startsWith(DEMO_CARD_PREFIX)).length;
  const viewerAccount=role==="callcenter"?"callcenter":activeProvider.code;
  const unreadByCase=useMemo(()=>{
   const counts:Record<string,number>={};
@@ -484,9 +486,16 @@ export default function Page(){
   const incomplete=uploadReview.previewRows.some(r=>r.missingRequired.length>0);
   const blocked=uploadReview.missingHeaders.length>0||incomplete||uploadReview.duplicate>0;
   if(blocked){setNotice("Upload diblokir. Perbaiki seluruh error pada file lalu pilih ulang file Excel.");return}
-  setMembers(v=>[...uploadReview.staged,...v]);
-  setNotice(uploadReview.valid+" peserta berhasil diupload ke Master Peserta.");
+  setMembers(v=>[...uploadReview.staged,...v.filter(m=>!m.cardNo.startsWith(DEMO_CARD_PREFIX))]);
+  setNotice(uploadReview.valid+" peserta berhasil diupload ke Master Peserta. Data contoh bawaan diganti oleh data Excel yang diupload.");
   setUploadReview(null);
+ }
+ function restoreDemoMaster(){
+  if(role!=="callcenter"||members.length)return;
+  const demo=makeDemoMaster();
+  setMembers(demo);
+  setMemberPage(1);setMemberQuery("");setReviewFilter("all");
+  setNotice(demo.length+" peserta SIMULASI berhasil dimuat kembali. Ini bukan data peserta asuransi asli.");
  }
  function deleteMember(card:string,name:string){
   if(!window.confirm("Hapus "+name+" ("+card+") dari Master Peserta? Case yang sudah pernah dibuat tidak ikut terhapus."))return;
@@ -1020,6 +1029,7 @@ export default function Page(){
   <main>
   <header><div><h1>{role==="provider"?(view==="dashboard"?"Provider Overview":"Provider Operations"):"Managed Care Command Center"}</h1><p>{role==="provider"?(view==="dashboard"?"Ringkasan pasien, provider, approval PertaLife, dan klaim. Seluruh transaksi melalui sidebar.":"Daftar pasien sesuai tahapan pelayanan; semua pengajuan melalui pop-up."):"Master peserta mengikuti struktur data Managed Care PertaLife."}</p></div><div className="switchWrap"><span className="switchLabel">Account Switcher</span>{unreadTotal>0&&<button type="button" className="caseUnreadGlobal" onClick={()=>{setStatusFilter(null);setView("cases");}} aria-label={unreadTotal+" komentar belum dibaca. Lihat daftar case."}><MessageSquareText size={15}/><span>{unreadTotal} baru</span></button>}<div className="account accountSelector"><div className="avatar">{role==="provider"?<Building2 size={18}/>:<ShieldCheck size={18}/>}</div><div className="accountSelectText"><b>{role==="provider"?activeProvider.name:"Call Center PertaLife"}</b><span>{role==="provider"?activeProvider.code:"Verifier 24/7"}</span></div><select aria-label="Account Switcher" value={role==="callcenter"?"callcenter":activeProvider.code} onChange={e=>{const v=e.target.value;if(v==="callcenter"){setRole("callcenter")}else{setRole("provider");setActiveProviderCode(v as typeof activeProviderCode)}setView("dashboard");setCareAccess("FKTP");setVisitType("Rawat Jalan");setReferralSearch("");setFkrtlBenefitCard(null);setNotice("");setFound(null);setLookupDone(false);setProfileDraft(null);setBankSearch("");setBankOpen(false)}}><option value="callcenter">Call Center PertaLife</option>{providerAccounts.map(p=><option key={p.code} value={p.code}>{p.name} — {p.code}</option>)}</select><ChevronDown size={17}/></div></div></header>
   {notice&&<div className="notice">{notice}</div>}
+  {role==="callcenter"&&(view==="dashboard"||view==="master")&&demoMasterCount>0&&<div className="notice"><strong>MASTER DEMO ({demoMasterCount} peserta simulasi).</strong> Data contoh tersedia otomatis di semua browser baru, bukan master peserta asli. Upload Excel master asli untuk mengganti data demo pada browser ini; data asli belum tersinkron antarperangkat.</div>}
 
   {view==="dashboard"&&<>
     <section className="providerOverview" aria-label="Ringkasan operasional">
@@ -1040,7 +1050,7 @@ export default function Page(){
     {members.length===0&&<small>Master Peserta belum tersedia di browser/domain ini. Upload master di menu Call Center → Master Peserta terlebih dahulu.</small>}
    </section>}
    {role==="callcenter"&&view==="master"&&<section className="card master">
-   <div className="sectionHead"><div><h2>Master Peserta Managed Care</h2><p>Struktur upload: 21 kolom master peserta. FASKES 1 CODE & FASKES 1 NAME wajib, PLAN CODE opsional.</p></div><div className="masterHeadActions"><span className="countPill">{members.length} peserta</span>{members.length>0&&<button className="dangerBtn" onClick={deleteAllMembers}><Trash2 size={15}/>Hapus Semua</button>}</div></div>
+   <div className="sectionHead"><div><h2>Master Peserta Managed Care</h2><p>Struktur upload: 21 kolom master peserta. FASKES 1 CODE & FASKES 1 NAME wajib, PLAN CODE opsional.</p></div><div className="masterHeadActions"><span className="countPill">{members.length} peserta</span>{members.length===0&&<button type="button" className="primary" onClick={restoreDemoMaster}><Plus size={15}/>Muat Master Demo</button>}{members.length>0&&<button className="dangerBtn" onClick={deleteAllMembers}><Trash2 size={15}/>Hapus Semua</button>}</div></div>
    {view==="master"&&<>
     <div className="bulkBox"><div className="bulkIcon"><FileSpreadsheet/></div><div><b>Bulk Upload Data Peserta</b><span>21 kolom termasuk FASKES 1 CODE dan FASKES 1 NAME. PLAN CODE boleh kosong.</span></div><div className="uploadControls"><label className="uploadBtn"><Upload size={17}/>Pilih File Excel<input type="file" accept=".xlsx,.xls" onChange={bulkUpload}/></label></div></div>
     {uploadReview&&<div className="reviewPanel">
